@@ -1,0 +1,22 @@
+# Ignorer l'environnement virtuel
+venv/
+ENV/
+env/
+.venv/
+
+# Ignorer les fichiers compilés Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorer les fichiers de logs
+*.log
+
+# Ignorer les fichiers de configuration locaux
+*.env
+*.sqlite3
+
+# Ignorer les dossiers générés par IDE
+.vscode/
+.idea/
