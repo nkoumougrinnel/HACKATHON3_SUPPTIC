@@ -1,0 +1,290 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage{parskip}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{csquotes}
+\usepackage{hyperref}
+
+\geometry{margin=3cm, top=3.5cm, bottom=3.5cm}
+\setstretch{1.4}
+
+\definecolor{accent}{RGB}{24, 95, 165}
+\definecolor{lightbg}{RGB}{245, 244, 240}
+\definecolor{reddark}{RGB}{121, 31, 31}
+\definecolor{greendark}{RGB}{15, 110, 86}
+
+\newmdenv[
+  backgroundcolor=lightbg,
+  linecolor=accent,
+  linewidth=2pt,
+  leftline=true, rightline=false, topline=false, bottomline=false,
+  innerleftmargin=14pt, innerrightmargin=14pt,
+  innertopmargin=10pt, innerbottommargin=10pt,
+  skipabove=12pt, skipbelow=12pt
+]{encadre}
+
+\newmdenv[
+  backgroundcolor=lightbg,
+  linecolor=reddark,
+  linewidth=2pt,
+  leftline=true, rightline=false, topline=false, bottomline=false,
+  innerleftmargin=14pt, innerrightmargin=14pt,
+  innertopmargin=10pt, innerbottommargin=10pt,
+  skipabove=12pt, skipbelow=12pt
+]{alerte}
+
+\newmdenv[
+  backgroundcolor=lightbg,
+  linecolor=greendark,
+  linewidth=2pt,
+  leftline=true, rightline=false, topline=false, bottomline=false,
+  innerleftmargin=14pt, innerrightmargin=14pt,
+  innertopmargin=10pt, innerbottommargin=10pt,
+  skipabove=12pt, skipbelow=12pt
+]{exemple}
+
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\vspace{-0.3em}\rule{\linewidth}{0.4pt}]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+
+\hypersetup{colorlinks=true, linkcolor=accent, urlcolor=accent}
+
+\title{
+  \textbf{Les routes qui sauvent des vies}\\[0.6em]
+  \large Une description du problème posé\\[0.3em]
+  \normalsize Sujet 07 — Hackverse 2026
+}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+\vspace{-1em}
+\tableofcontents
+\newpage
+
+
+% ───────────────────────────────────────────────────────
+\section{La situation de départ}
+
+Dans une grande ville africaine de deux millions d'habitants, quand
+quelqu'un compose le numéro des secours, il faut en moyenne vingt-trois
+minutes avant qu'une ambulance ou un camion de pompiers arrive sur place.
+Vingt-trois minutes. Pour une crise cardiaque, une noyade, un incendie
+qui commence à se propager, c'est souvent trop long.
+
+Ce retard n'est pas dû à un manque de véhicules. Les secours existent.
+Ils sont disponibles. Le problème est ailleurs : personne ne sait vraiment
+quel chemin emprunter. Les conducteurs font appel à leur connaissance du
+terrain, à leur expérience du trafic à telle heure, à leur intuition.
+Parfois ça marche. Parfois non.
+
+La ville, elle, ne se laisse pas facilement traverser. Les routes changent
+de nature selon les quartiers : certaines sont goudronnées et rapides,
+d'autres sont des pistes en latérite qui deviennent des bourbiers dès
+qu'il pleut. Le trafic suit des habitudes prévisibles le matin et le soir,
+mais il peut se figer en quelques minutes à cause d'un accident, d'un
+marché qui déborde sur la chaussée, ou d'un camion renversé en plein
+carrefour. La nuit, certains axes deviennent dangereux ou impraticables
+et les secours doivent les éviter.
+
+\begin{encadre}
+L'objectif est donc le suivant : construire un système capable de dire,
+à chaque instant, quel est le meilleur chemin pour un véhicule de secours
+donné, vers une destination donnée, dans les conditions exactes du moment.
+Et si ce chemin se bloque en cours de route, le système doit en trouver un
+autre — immédiatement, sans que le conducteur ait besoin de s'arrêter et
+de réfléchir.
+\end{encadre}
+
+
+% ───────────────────────────────────────────────────────
+\section{Le piège du sujet}
+
+À première lecture, le problème ressemble à une question classique
+d'informatique : trouver le plus court chemin dans un réseau. On connaît
+les intersections, on connaît les routes qui les relient, on calcule.
+Des algorithmes très efficaces existent pour cela. Une équipe motivée
+pourrait en construire un en quelques heures.
+
+Mais le sujet contient un avertissement volontairement dissimulé. Il dit,
+en substance : une équipe peut avancer vite, produire beaucoup, et
+découvrir trop tard qu'elle a soigneusement résolu le mauvais problème.
+
+\begin{alerte}
+\textbf{Le vrai piège.}
+Calculer le plus court chemin suppose que l'on dispose d'informations
+fiables sur l'état du réseau au moment où l'on calcule. Mais dans la
+réalité, les informations arrivent en retard, viennent de sources peu
+sûres, ou sont tout simplement incomplètes. Le système qui ne tient pas
+compte de cela prend des décisions qui semblent bonnes sur le papier,
+mais qui peuvent s'avérer désastreuses sur le terrain.
+\end{alerte}
+
+Ce n'est donc pas seulement un problème de navigation. C'est un problème
+de décision dans l'incertitude. Et ces deux choses sont très différentes.
+
+
+% ───────────────────────────────────────────────────────
+\section{Ce que le système doit vraiment faire}
+
+On peut résumer les attentes en trois mots : choisir, s'adapter,
+et expliquer.
+
+\subsection{Choisir}
+
+Le système doit choisir un chemin. Pas le chemin parfait — il n'existe
+pas toujours. Mais le meilleur chemin possible avec ce que l'on sait
+à cet instant. Ce choix doit respecter des règles absolues : ne jamais
+envoyer un véhicule sur un pont qui ne peut pas supporter son poids,
+ne jamais engager une ambulance sur une piste inondée la nuit, ne jamais
+proposer un itinéraire dont on sait qu'il dépassera le délai maximal
+acceptable.
+
+\subsection{S'adapter}
+
+Le monde change pendant que le véhicule roule. Une route se bloque.
+La pluie commence à tomber. Un signalement arrive. Le système doit
+détecter ces changements et recalculer le chemin sans attendre que
+le conducteur se retrouve bloqué. Cette capacité à réagir en temps
+réel est l'une des exigences centrales du problème.
+
+\subsection{Expliquer}
+
+C'est ici que le sujet devient original et difficile. Le système doit
+être capable de justifier chacune de ses décisions, même après coup.
+Si une ambulance arrive en retard, si un chemin s'avère mauvais, si
+un responsable demande des comptes un mois plus tard, le système doit
+pouvoir répondre : voilà ce que je savais à tel moment, voilà les
+informations que j'avais, voilà pourquoi j'ai choisi ce chemin plutôt
+qu'un autre.
+
+Ce n'est pas une exigence accessoire. C'est au c\oe{}ur du problème.
+Un système qui prend de bonnes décisions mais ne peut pas les justifier
+est un système en qui personne ne peut avoir confiance.
+
+
+% ───────────────────────────────────────────────────────
+\section{Une situation concrète : l'ambulance de Bépanda}
+
+Pour rendre tout cela tangible, voici une situation qui illustre les
+trois exigences — et qui montre précisément ce qui se passe quand les
+informations sont imparfaites.
+
+\subsection{Le départ — tout va bien}
+
+Il est 14h22. Un enfant de sept ans fait des convulsions dans le quartier
+Bépanda. L'appel arrive au SAMU. Le système calcule immédiatement le
+meilleur chemin : Avenue Bépanda, puis Boulevard de la Liberté, puis le
+CHU. Durée estimée : neuf minutes. L'ambulance part. La situation est
+nominale.
+
+\subsection{Première situation imparfaite — une information qui arrive trop tard}
+
+Il est 14h25. Le système reçoit une alerte : le Boulevard de la Liberté
+est entièrement bloqué par un camion-remorque renversé. Problème : cette
+alerte a été générée à 14h21. Elle a mis quatre minutes à traverser le
+réseau de collecte surchargé avant d'arriver. Pendant ces quatre minutes,
+l'ambulance a continué à rouler vers ce boulevard.
+
+Le système se retrouve donc dans une situation inconfortable. Il sait que
+la route est bloquée, mais avec une information vieille de quatre minutes.
+Il ne sait pas exactement où se trouve l'ambulance en ce moment — son
+signal GPS rame de trente secondes. Il ne sait pas si elle a déjà
+franchi le carrefour critique ou si elle peut encore dévier.
+
+Il doit pourtant décider immédiatement. Il évalue trois options : continuer
+vers le boulevard en espérant que le blocage soit partiel, prendre la Rue
+Makepe qui est une piste non goudronnée mais plus courte que le demi-tour,
+ou faire demi-tour complet vers l'Avenue de Gaulle. Le demi-tour complet
+dépasse le délai maximum. Le système choisit la Rue Makepe et envoie
+l'instruction au conducteur.
+
+\begin{exemple}
+\textbf{Ce que le système enregistre à ce moment.}
+Il note l'heure exacte de sa décision, l'heure à laquelle l'alerte
+lui est parvenue, l'heure à laquelle l'alerte a été générée sur le terrain,
+la dernière position connue du véhicule, et les trois options qu'il a
+évaluées avec leurs coûts respectifs. Si quelqu'un interroge le système
+plus tard, il pourra reconstituer exactement pourquoi ce choix a été fait
+avec les informations disponibles à cet instant.
+\end{exemple}
+
+\subsection{Deuxième situation imparfaite — une source peu fiable}
+
+Il est 14h27. L'ambulance roule sur la Rue Makepe depuis une minute et
+demie. Une nouvelle alerte arrive : un habitant signale via une application
+mobile de l'eau sur la chaussée, au niveau du marché, à environ six cents
+mètres devant le véhicule. L'alerte ne précise pas la hauteur de l'eau.
+Et surtout, ce même signaleur avait envoyé une fausse alerte sept jours
+plus tôt, dans le même secteur.
+
+Le conducteur, lui, confirme par radio qu'il voit de l'eau au loin mais
+ne peut pas encore juger si c'est passable.
+
+Le système est maintenant dans une situation encore plus délicate que la
+première. Il ne peut pas ignorer l'alerte — si l'eau est profonde et que
+l'ambulance s'y engage, elle sera bloquée avec l'enfant à bord, loin de
+tout. Il ne peut pas non plus y croire aveuglément et ordonner un demi-tour
+immédiat — la source est peu fiable, et tout autre itinéraire de substitution
+dépasserait le délai maximum.
+
+Il prend alors une décision de compromis : il maintient la route actuelle
+de façon provisoire, envoie un message au conducteur lui demandant de
+confirmer si le passage est praticable dans les quatre-vingt-dix prochaines
+secondes, et recalcule en parallèle un itinéraire de repli prêt à être
+envoyé si la confirmation n'arrive pas.
+
+\begin{exemple}
+\textbf{Ce que le système enregistre à ce moment.}
+Il note la fiabilité estimée de la source, le fait que cette même source
+avait déjà produit une fausse alerte, le délai de réponse demandé au
+conducteur, et l'itinéraire de repli prêt à l'envoi. La limite de
+quatre-vingt-dix secondes est documentée : elle est calculée pour laisser
+au conducteur le temps d'évaluer la situation sans compromettre l'arrivée
+dans les délais si le repli devient nécessaire.
+\end{exemple}
+
+\subsection{La résolution}
+
+À 14h28, soit cinquante-quatre secondes après la demande de confirmation,
+le conducteur répond : l'eau mesure environ dix centimètres, le passage
+est possible. Le système valide l'itinéraire, annule le repli, et note
+que la source du signalement a produit une information exagérée — ce qui
+sera pris en compte pour pondérer ses prochaines alertes.
+
+L'ambulance arrive au CHU à 14h31. Neuf minutes après le départ.
+L'enfant est pris en charge dans les délais.
+
+\subsection{Ce que ce scénario révèle}
+
+Ce qui rend cette situation instructive, ce n'est pas qu'elle se soit
+bien terminée. C'est que le système a dû prendre deux décisions
+consécutives sur la base d'informations dégradées — une information en
+retard, puis une information de source peu fiable — sans jamais avoir
+la certitude que son choix était le bon.
+
+Et pourtant, à chaque étape, sa décision était justifiable : elle était
+la meilleure possible avec ce que le système savait à ce moment-là.
+C'est exactement ce que le problème demande.
+
+
+% ───────────────────────────────────────────────────────
+\section{Le problème en une phrase}
+
+\begin{encadre}
+Construire un moteur capable de guider un véhicule de secours à travers
+une ville africaine dont le réseau change en permanence, en prenant les
+meilleures décisions possibles avec des informations qui peuvent être
+incomplètes, en retard ou peu fiables — et en étant toujours en mesure
+d'expliquer, après coup, pourquoi chaque décision a été prise.
+\end{encadre}
+
+\end{document}
