@@ -1,0 +1,853 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Packages ────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, decorations.markings}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{mdframed}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+% ─── Colors ──────────────────────────────────────────────────────────────────
+\definecolor{urgence}{RGB}{180,30,30}
+\definecolor{theorie}{RGB}{30,80,160}
+\definecolor{pratique}{RGB}{20,130,80}
+\definecolor{attention}{RGB}{200,120,0}
+\definecolor{grisléger}{RGB}{245,245,245}
+\definecolor{bleuléger}{RGB}{230,240,255}
+\definecolor{vertléger}{RGB}{230,248,238}
+
+% ─── Custom environments ──────────────────────────────────────────────────────
+\newtcolorbox{defbox}[1]{
+  colback=bleuléger, colframe=theorie, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{metierbox}[1]{
+  colback=vertléger, colframe=pratique, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{alertbox}[1]{
+  colback=yellow!10, colframe=attention, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{jurybox}[1]{
+  colback=red!5, colframe=urgence, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+% ─── Theorem styles ───────────────────────────────────────────────────────────
+\theoremstyle{definition}
+\newtheorem{definition}{Définition}[section]
+\newtheorem{propriete}{Propriété}[section]
+\newtheorem{invariant}{Invariant métier}[section]
+
+\theoremstyle{remark}
+\newtheorem{remarque}{Remarque}[section]
+\newtheorem{exemple}{Exemple}[section]
+
+% ─── Hyperref setup ───────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=theorie,
+  urlcolor=urgence,
+  pdftitle={Routage d'urgence dynamique avec A*},
+  pdfauthor={Système de routage critique},
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ═══════════════════════════════════════════════════════════════════
+%  COUVERTURE
+% ═══════════════════════════════════════════════════════════════════
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\color{urgence}\rule{\linewidth}{2pt}}\\[0.5em]
+  {\Huge\bfseries Moteur de Routage d'Urgence}\\[0.4em]
+  {\Large\bfseries Algorithme A* à Poids Dynamiques}\\[0.4em]
+  {\color{urgence}\rule{\linewidth}{2pt}}\\[2em]
+
+  \begin{tikzpicture}
+    \node[circle, fill=urgence!20, draw=urgence, thick, minimum size=2cm] (s) at (0,0) {\textbf{S}};
+    \node[circle, fill=theorie!20, draw=theorie, thick, minimum size=1.5cm] (a) at (3,1.5) {A};
+    \node[circle, fill=theorie!20, draw=theorie, thick, minimum size=1.5cm] (b) at (3,-1.5) {B};
+    \node[circle, fill=theorie!20, draw=theorie, thick, minimum size=1.5cm] (c) at (6,0) {C};
+    \node[circle, fill=pratique!20, draw=pratique, thick, minimum size=2cm] (t) at (9,0) {\textbf{T}};
+    \draw[-{Latex[length=3mm]}, theorie, thick] (s) -- node[above,sloped,font=\small]{$w=3$} (a);
+    \draw[-{Latex[length=3mm]}, urgence, thick, dashed] (s) -- node[below,sloped,font=\small]{$w=5\to8$} (b);
+    \draw[-{Latex[length=3mm]}, theorie, thick] (a) -- node[above,sloped,font=\small]{$w=2$} (c);
+    \draw[-{Latex[length=3mm]}, theorie, thick] (b) -- node[below,sloped,font=\small]{$w=4$} (c);
+    \draw[-{Latex[length=3mm]}, pratique, thick] (c) -- node[above,sloped,font=\small]{$w=1$} (t);
+    \node[font=\footnotesize, color=urgence] at (1.5,-2.5) {Arc vieilli (trafic)};
+  \end{tikzpicture}\\[2em]
+
+  {\large Note technique — Systèmes critiques d'aide à la décision}\\[1em]
+  {\large\color{gray} Contexte : services d'urgence (SAMU, pompiers, ambulances)}\\[3em]
+
+  \begin{tabular}{rl}
+    \textbf{Domaine :} & Algorithmique appliquée aux systèmes critiques \\
+    \textbf{Données :} & Graphe OSM Yaoundé + trafic horaire par segment \\
+    \textbf{Révision :} & Poids actualisés toutes les 5 minutes \\
+    \textbf{Véhicules :} & Ambulance, camion de pompiers, véhicule léger \\
+  \end{tabular}
+
+  \vfill
+  {\small\color{gray} Document pédagogique — Présentation jury et équipe technique}
+\end{titlepage}
+
+% ═══════════════════════════════════════════════════════════════════
+%  TABLE DES MATIÈRES
+% ═══════════════════════════════════════════════════════════════════
+\tableofcontents
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+%  INTRODUCTION
+% ═══════════════════════════════════════════════════════════════════
+\section*{Introduction}
+\addcontentsline{toc}{section}{Introduction}
+
+Un moteur de routage pour les services d'urgence doit prendre des décisions
+\emph{rapides}, \emph{fiables} et \emph{adaptatives}. Contrairement à la
+navigation civile classique (Google Maps, Waze), le routage d'urgence opère
+dans un environnement où :
+
+\begin{itemize}
+  \item chaque minute perdue peut coûter une vie ;
+  \item les conditions de circulation changent en continu (accidents, pluie,
+        barrages, foules) ;
+  \item les contraintes de passabilité dépendent du véhicule (ambulance
+        $\neq$ camion de pompiers $\neq$ véhicule léger) ;
+  \item le système doit être \emph{auditabl}e et \emph{explicable} devant
+        un jury ou une autorité de certification.
+\end{itemize}
+
+Ce document explique, de manière progressive, comment l'algorithme A*
+peut être adapté à ce contexte, comment les poids des arcs évoluent dans le
+temps (\emph{vieillissement}), et quels invariants métier le système doit
+respecter en toute circonstance.
+
+\bigskip
+\noindent\textbf{Données réelles utilisées.}
+Les exemples numériques s'appuient sur deux jeux de données concrets :
+\begin{enumerate}
+  \item \texttt{export.geojson} — graphe routier OpenStreetMap (Yaoundé)
+        contenant arcs, nœuds et attributs de voiries ;
+  \item \texttt{traffic\_by\_segment\_hour.csv} — 2\,400 enregistrements
+        de trafic horaire par segment, incluant vitesse moyenne, niveau de
+        congestion, multiplicateur de temps de parcours, passabilité ambulance
+        / camion, et présence de pluie.
+\end{enumerate}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+%  SECTION 1 — THÉORIE DES GRAPHES ET POIDS DYNAMIQUES
+% ═══════════════════════════════════════════════════════════════════
+\section{Graphes pondérés et vieillissement des arcs}
+
+\subsection{Modélisation du réseau routier comme graphe pondéré}
+
+\begin{defbox}{Définition : Graphe pondéré orienté}
+Un \textbf{graphe pondéré orienté} est un triplet $G = (V, E, w)$ où :
+\begin{itemize}
+  \item $V$ est l'ensemble des \textbf{nœuds} (intersections, points remarquables) ;
+  \item $E \subseteq V \times V$ est l'ensemble des \textbf{arcs} (segments de route) ;
+  \item $w : E \to \mathbb{R}^+$ est une fonction de \textbf{pondération} qui
+        associe à chaque arc $(u,v)$ un coût $w(u,v) > 0$.
+\end{itemize}
+\end{defbox}
+
+Dans le contexte routier :
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Élément du graphe} & \textbf{Objet réel} & \textbf{Exemple} \\
+  \midrule
+  Nœud $v \in V$ & Intersection, rond-point & Carrefour Nlongkak \\
+  Arc $(u,v) \in E$ & Segment de voie & Tronçon avenue Kennedy \\
+  Poids $w(u,v)$ & Temps de parcours (secondes) & 47\,s en heure creuse \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{remarque}
+  Le poids $w(u,v)$ n'est \emph{pas} une distance physique, mais un
+  \textbf{temps de parcours estimé}, dépendant de la vitesse, du trafic,
+  des conditions météo et du type de véhicule.
+\end{remarque}
+
+\subsection{Le vieillissement des arcs — définition formelle}
+
+\begin{defbox}{Définition : Arc temporellement pondéré (poids vieillissant)}
+On dit qu'un arc $(u,v)$ est \textbf{vieillissant} si son poids est une
+fonction du temps :
+$$
+w(u,v,t) = w_0(u,v) \cdot \mu(u,v,t)
+$$
+où :
+\begin{itemize}
+  \item $w_0(u,v)$ est le \textbf{poids de base} (temps à vitesse libre,
+        conditions idéales) ;
+  \item $\mu(u,v,t) \geq 1$ est le \textbf{multiplicateur temporel},
+        reflétant la dégradation des conditions à l'instant $t$.
+\end{itemize}
+\end{defbox}
+
+\noindent\textbf{Données réelles — multiplicateurs observés} (fichier
+\texttt{traffic\_by\_segment\_hour.csv}, 2\,400 relevés) :
+
+\begin{center}
+\begin{tabular}{lrrr}
+  \toprule
+  \textbf{Type de voie} & \textbf{Multiplicateur moyen} &
+  \textbf{Max observé} & \textbf{Interprétation} \\
+  \midrule
+  Autoroute / trunk  & $\times 1{,}57$  & $\times 3{,}33$ &
+      Congestion possible aux heures de pointe \\
+  Primaire           & $\times 1{,}58$  & $\times 3{,}33$ &
+      Axes urbains soumis à la congestion \\
+  Secondaire         & $\times 1{,}77$  & $\times 3{,}33$ &
+      Voies mixtes, trafic irrégulier \\
+  Tertiaire          & $\times 1{,}78$  & $\times 3{,}33$ &
+      Routes de quartier, congestion fréquente \\
+  Résidentielle      & $\times 1{,}78$  & $\times 3{,}33$ &
+      Voies étroites, imprévus fréquents \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{alertbox}{Interprétation critique}
+Un multiplicateur maximal de $\times 3{,}33$ signifie qu'un trajet de
+10 minutes en conditions idéales peut prendre \textbf{33 minutes} en
+situation de congestion extrême. Pour une ambulance, cette différence
+est potentiellement fatale.
+\end{alertbox}
+
+\subsection{Illustration graphique du vieillissement}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+  \begin{axis}[
+    width=13cm, height=6cm,
+    xlabel={Heure de la journée},
+    ylabel={Multiplicateur $\mu(t)$},
+    xmin=0, xmax=23,
+    ymin=1, ymax=3.5,
+    xtick={0,3,6,9,12,15,18,21},
+    grid=major,
+    grid style={gray!30},
+    legend pos=north west,
+    title={Évolution temporelle du poids d'un arc — exemple autoroute vs résidentiel}
+  ]
+  % Motorway approximation
+  \addplot[color=theorie, thick, smooth] coordinates {
+    (0,1.3) (3,1.2) (6,1.8) (7,2.5) (8,2.8) (9,2.2)
+    (12,1.6) (13,1.5) (17,2.4) (18,3.0) (19,2.5) (21,1.5) (23,1.2)
+  };
+  \addlegendentry{Autoroute ($\mu$ moyen $1{,}57$)}
+
+  % Residential approximation
+  \addplot[color=urgence, thick, smooth, dashed] coordinates {
+    (0,1.4) (3,1.3) (6,2.0) (7,2.8) (8,3.2) (9,2.6)
+    (12,1.9) (13,1.7) (17,2.7) (18,3.3) (19,2.9) (21,1.8) (23,1.4)
+  };
+  \addlegendentry{Résidentielle ($\mu$ moyen $1{,}78$)}
+
+  % 5-minute window
+  \addplot[fill=attention!20, draw=none, forget plot]
+    coordinates {(8,1)} -- (axis cs:8,3.5) -- (axis cs:8.083,3.5) -- (axis cs:8.083,1) -- cycle;
+  \node[font=\tiny, color=attention] at (axis cs:8.5, 3.3) {fenêtre 5 min};
+  \end{axis}
+\end{tikzpicture}
+\caption{Le poids d'un arc varie au cours du temps. La fenêtre de 5 minutes
+  représente l'intervalle de recalcul du chemin optimal.}
+\end{figure}
+
+\subsection{Pourquoi un chemin optimal à $t_0$ devient sous-optimal à $t_0 + \Delta t$}
+
+\begin{defbox}{Propriété : Instabilité temporelle de l'optimalité}
+Soit $P^*(t_0) = (v_0, v_1, \ldots, v_k)$ le chemin optimal calculé à $t_0$.
+Son coût total est :
+$$
+\text{coût}(P^*, t_0) = \sum_{i=0}^{k-1} w(v_i, v_{i+1}, t_0)
+$$
+À $t_0 + \Delta t$, ce même chemin a un coût réel :
+$$
+\text{coût}(P^*, t_0 + \Delta t) = \sum_{i=0}^{k-1} w(v_i, v_{i+1},\; t_0 + \Delta t)
+$$
+Il existe un chemin alternatif $P'$ tel que :
+$$
+\text{coût}(P', t_0 + \Delta t) < \text{coût}(P^*, t_0 + \Delta t)
+$$
+$P^*$ n'est alors \textbf{plus optimal}.
+\end{defbox}
+
+\paragraph{Scénario concret.}
+Une ambulance part à $t_0 =$ 08h00 par l'avenue Kennedy (chemin optimal).
+À 08h05, un accident bloque cette avenue — le multiplicateur passe de
+$\times 1{,}8$ à $\times 3{,}2$. Sans recalcul, l'ambulance s'engage
+dans un chemin devenu 78\,\% plus lent que l'alternative disponible.
+
+\bigskip
+\noindent C'est précisément pourquoi le moteur recalcule le chemin \textbf{toutes
+les 5 minutes} (ou à chaque événement critique détecté).
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+%  SECTION 2 — L'ALGORITHME A* ET SON ADAPTATION DYNAMIQUE
+% ═══════════════════════════════════════════════════════════════════
+\section{L'algorithme A* et son adaptation aux poids dynamiques}
+
+\subsection{Rappel : A* classique}
+
+A* est un algorithme de recherche de chemin le plus court qui améliore
+Dijkstra en utilisant une \textbf{heuristique} pour guider l'exploration
+vers la destination, réduisant ainsi le nombre de nœuds explorés.
+
+\begin{defbox}{Fonction d'évaluation de A*}
+Pour chaque nœud $n$ exploré, A* calcule :
+$$
+f(n) = g(n) + h(n)
+$$
+\begin{itemize}
+  \item $g(n)$ : coût réel du chemin depuis la source jusqu'à $n$ ;
+  \item $h(n)$ : estimation heuristique du coût restant de $n$ jusqu'à
+        la destination ;
+  \item $f(n)$ : estimation du coût total du chemin passant par $n$.
+\end{itemize}
+A* explore en priorité les nœuds avec la plus petite valeur de $f(n)$.
+\end{defbox}
+
+\begin{propriete}[Admissibilité de l'heuristique]
+  Pour qu'A* garantisse l'optimalité, l'heuristique $h(n)$ doit être
+  \textbf{admissible} : elle ne doit jamais surestimer le coût réel.
+  $$
+  h(n) \leq h^*(n) \quad \forall n \in V
+  $$
+  où $h^*(n)$ est le coût réel optimal depuis $n$ vers la destination.
+\end{propriete}
+
+\noindent\textbf{Heuristique recommandée pour le routage urbain :}
+$$
+h(n) = \frac{d_{\text{euclidienne}}(n, \text{destination})}{v_{\max}}
+$$
+où $v_{\max}$ est la vitesse maximale autorisée sur le réseau.
+Cette heuristique est admissible car un véhicule ne peut pas aller plus
+vite que $v_{\max}$.
+
+\subsection{Pseudocode d'A* adapté aux poids dynamiques}
+
+\begin{algorithm}[H]
+\caption{A* dynamique avec poids temporels et contraintes véhicule}
+\begin{algorithmic}[1]
+\Require Graphe $G=(V,E,w)$, source $s$, destination $t$,
+         instant $t_0$, type véhicule $\tau$
+\Ensure Chemin optimal $P^*$ ou \textsc{Aucun}
+
+\State $\text{ouvert} \gets \{s\}$ \Comment{File de priorité}
+\State $g[s] \gets 0$
+\State $f[s] \gets h(s, t)$
+\State $\text{parent}[s] \gets \text{null}$
+
+\While{$\text{ouvert} \neq \emptyset$}
+  \State $n \gets \arg\min_{x \in \text{ouvert}} f[x]$
+  \If{$n = t$}
+    \Return \Call{ReconstruireChemin}{parent, $t$}
+  \EndIf
+  \State Retirer $n$ de ouvert
+
+  \For{chaque voisin $m$ de $n$, arc $(n,m)$}
+    \If{\textbf{non} \Call{Passable}{$(n,m)$, $\tau$, $t_0$}}
+      \State \textbf{continuer} \Comment{Filtre de passabilité véhicule}
+    \EndIf
+    \State $w_{\text{eff}} \gets w_0(n,m) \cdot \mu(n,m, t_0) \cdot \phi_\tau(n,m)$
+    \State $g_{\text{tentative}} \gets g[n] + w_{\text{eff}}$
+    \If{$g_{\text{tentative}} < g[m]$}
+      \State $g[m] \gets g_{\text{tentative}}$
+      \State $f[m] \gets g[m] + h(m, t)$
+      \State $\text{parent}[m] \gets n$
+      \State Ajouter $m$ à ouvert (ou mettre à jour sa priorité)
+    \EndIf
+  \EndFor
+\EndWhile
+\Return \textsc{Aucun} \Comment{Destination inatteignable}
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Nouveaux paramètres par rapport à A* classique :}
+\begin{itemize}
+  \item $\mu(n,m,t_0)$ : multiplicateur de congestion à l'instant $t_0$
+        (issu du fichier de trafic) ;
+  \item $\phi_\tau(n,m)$ : facteur de pénalité propre au type de véhicule $\tau$
+        (ambulance, camion de pompiers, etc.) ;
+  \item \textsc{Passable}$(e, \tau, t)$ : prédicat booléen vérifiant si
+        l'arc $e$ est physiquement franchissable par le véhicule $\tau$
+        à l'instant $t$.
+\end{itemize}
+
+\subsection{Modélisation des facteurs de pondération}
+
+\subsubsection{Facteur de congestion $\mu(u,v,t)$}
+
+Le multiplicateur $\mu$ est extrait de la table de trafic horaire et
+interpolé linéairement entre deux mesures consécutives :
+
+$$
+\mu(u,v,t) = \mu_h + \frac{t - t_h}{t_{h+1} - t_h} \cdot (\mu_{h+1} - \mu_h)
+$$
+
+où $h = \lfloor t / 3600 \rfloor$ est l'heure courante.
+
+\subsubsection{Facteur météorologique $\rho(u,v,t)$}
+
+La pluie est codifiée dans les données (\texttt{rain = oui/non}).
+En présence de pluie, le poids est pénalisé :
+
+$$
+\rho(u,v,t) = \begin{cases} 1{,}0 & \text{si sec} \\ 1{,}25 & \text{si pluie légère} \\ 1{,}6 & \text{si pluie forte} \end{cases}
+$$
+
+\subsubsection{Facteur de passabilité par type de véhicule $\phi_\tau$}
+
+\begin{center}
+\begin{tabular}{lccc}
+  \toprule
+  \textbf{Type de voie} & \textbf{Ambulance} &
+  \textbf{Camion pompiers} & \textbf{Véh. léger} \\
+  \midrule
+  Autoroute    & $\phi = 1{,}0$ & $\phi = 1{,}0$ & $\phi = 1{,}0$ \\
+  Primaire     & $\phi = 1{,}0$ & $\phi = 1{,}05$ & $\phi = 1{,}0$ \\
+  Secondaire   & $\phi = 1{,}05$ & $\phi = 1{,}15$ & $\phi = 1{,}0$ \\
+  Tertiaire    & $\phi = 1{,}1$ & $\phi = 1{,}3$ & $\phi = 1{,}0$ \\
+  Résidentielle & $\phi = 1{,}15$ & \textit{bloqué} & $\phi = 1{,}0$ \\
+  Chemin piéton & \textit{bloqué} & \textit{bloqué} & \textit{bloqué} \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent La valeur \emph{bloqué} est implémentée en affectant
+$w_{\text{eff}} = +\infty$ (ou en sautant l'arc via le prédicat
+\textsc{Passable}).
+
+\subsubsection{Poids effectif complet}
+
+Le poids effectif final utilisé par A* est :
+
+\begin{equation}
+\boxed{
+  w_{\text{eff}}(u,v,t,\tau) =
+    w_0(u,v) \cdot \mu(u,v,t) \cdot \rho(u,v,t) \cdot \phi_\tau(u,v)
+}
+\end{equation}
+
+\subsection{Recalcul périodique — stratégie de réinitialisation}
+
+Le recalcul toutes les 5 minutes n'implique pas nécessairement de
+repartir de zéro. Deux stratégies sont envisageables :
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Stratégie} & \textbf{Avantage} & \textbf{Inconvénient} \\
+  \midrule
+  Recalcul complet (A* from scratch) &
+      Toujours optimal & Coûteux si graphe large \\
+  Recalcul incrémental (D* Lite) &
+      Rapide, ne retraite que les arcs modifiés &
+      Implémentation complexe \\
+  Recalcul partiel (rayon $r$ km) &
+      Bon compromis & Peut rater une déviation lointaine \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{metierbox}{Recommandation pour les services d'urgence}
+  Pour les systèmes temps-réel avec des graphes de taille urbaine
+  ($|V| < 100\,000$ nœuds), le \textbf{recalcul complet toutes les 5
+  minutes} est préférable pour sa \emph{simplicité}, sa
+  \emph{correctness} garantie, et sa \emph{auditabilité}.
+  La latence de recalcul est typiquement inférieure à 200\,ms sur
+  un réseau urbain standard.
+\end{metierbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+%  SECTION 3 — NÉCESSITÉ DU RECALCUL PÉRIODIQUE
+% ═══════════════════════════════════════════════════════════════════
+\section{Nécessité du recalcul périodique}
+
+\subsection{Le problème du chemin fossilisé}
+
+\begin{defbox}{Définition : Chemin fossilisé}
+  Un \textbf{chemin fossilisé} est un chemin calculé à $t_0$ et suivi
+  sans recalcul jusqu'à $t_0 + T$, alors que le graphe a évolué entre
+  ces deux instants. Il peut devenir largement sous-optimal ou même
+  infranchissable.
+\end{defbox}
+
+\paragraph{Exemple chiffré.}
+Supposons un trajet source $\to$ destination de distance $d = 8$\,km
+sur autoroute. À $t_0$, le multiplicateur est $\mu = 1{,}2$.
+À $t_0 + 10$\,min, un accident survient et $\mu$ passe à $3{,}0$.
+Une voie alternative secondaire avec $\mu = 1{,}5$ existait.
+
+\begin{center}
+\begin{tabular}{lccc}
+  \toprule
+  & \textbf{Chemin fossilisé} & \textbf{Alternative} &
+  \textbf{Écart} \\
+  \midrule
+  Vitesse libre & 90 km/h & 60 km/h & --- \\
+  Multiplicateur réel & $\times 3{,}0$ & $\times 1{,}5$ & --- \\
+  Vitesse effective & 30 km/h & 40 km/h & --- \\
+  Temps de parcours & 16 min & 12 min & \textbf{+4 min} \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent 4 minutes de retard pour une ambulance en arrêt cardiaque peuvent
+représenter une différence de survie significative (la survie au
+défibrillateur décroît d'environ 10\,\% par minute).
+
+\subsection{Événements déclencheurs d'un recalcul anticipé}
+
+En plus du recalcul périodique toutes les 5 minutes, certains événements
+doivent déclencher un recalcul \emph{immédiat} :
+
+\begin{enumerate}
+  \item \textbf{Détection d'un arc bloqué} (accident, travaux) sur le
+        chemin courant ;
+  \item \textbf{Hausse brutale du multiplicateur} d'un arc du chemin
+        courant ($\Delta\mu > \theta$, seuil à définir) ;
+  \item \textbf{Changement de conditions météo} (début de pluie forte) ;
+  \item \textbf{Signal du conducteur} (déviation manuelle, obstacle visuel).
+\end{enumerate}
+
+\subsection{Schéma de la boucle de recalcul}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  box/.style={rectangle, rounded corners, draw=theorie, fill=bleuléger,
+               minimum width=3.5cm, minimum height=1cm, align=center, font=\small},
+  urgbox/.style={rectangle, rounded corners, draw=urgence, fill=red!8,
+               minimum width=3.5cm, minimum height=1cm, align=center, font=\small},
+  arr/.style={-{Latex[length=3mm]}, thick}
+]
+  \node[box] (init)  at (0,0)    {Départ mission\\à $t_0$};
+  \node[box] (calc)  at (4,0)    {Calcul A*\\$P^*(t_0)$};
+  \node[box] (nav)   at (8,0)    {Navigation\\sur $P^*$};
+  \node[box] (timer) at (8,-2.5) {Minuterie\\5 min écoulées ?};
+  \node[urgbox] (evt) at (4,-2.5) {Événement\\critique ?};
+  \node[box] (update) at (0,-2.5) {Mise à jour\\des poids $w(t)$};
+  \node[box] (arrive) at (8,2)   {Arrivée\\destination};
+
+  \draw[arr] (init) -- (calc);
+  \draw[arr] (calc) -- (nav);
+  \draw[arr] (nav) -- (arrive);
+  \draw[arr] (nav) -- (timer);
+  \draw[arr] (timer) -- node[right, font=\tiny]{oui} (evt);
+  \draw[arr] (timer.east) -- ++(0.8,0) |- node[right, font=\tiny, pos=0.25]{non} (nav.east);
+  \draw[arr] (evt) -- node[above, font=\tiny]{oui} (update);
+  \draw[arr] (evt.east) -- ++(0.5,0) |- node[right, font=\tiny, pos=0.25]{non} (nav.east);
+  \draw[arr] (update) -- (calc);
+\end{tikzpicture}
+\caption{Boucle de recalcul périodique et événementiel du moteur de routage.}
+\end{figure}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+%  SECTION 4 — INVARIANTS MÉTIER
+% ═══════════════════════════════════════════════════════════════════
+\section{Invariants métier et contraintes de sécurité}
+
+Un invariant métier est une \textbf{propriété qui doit rester vraie à tout
+instant}, indépendamment des optimisations algorithmiques.
+
+\subsection{Invariants fondamentaux}
+
+\begin{invariant}[Accessibilité garantie]
+  Le système doit \textbf{toujours} fournir un chemin vers la destination
+  si la destination est physiquement accessible, même si ce chemin n'est
+  pas optimal.
+  $$
+  \exists\, P : s \xrightarrow{*} t \;\Rightarrow\; \text{moteur retourne } P \neq \emptyset
+  $$
+\end{invariant}
+
+\begin{invariant}[Passabilité physique du véhicule]
+  Aucun arc retourné dans le chemin ne doit être marqué comme impraticable
+  pour le type de véhicule $\tau$ demandeur.
+  $$
+  \forall (u,v) \in P^* : \textsc{Passable}(u,v,\tau,t) = \text{vrai}
+  $$
+\end{invariant}
+
+\begin{invariant}[Délai maximal admissible]
+  Le chemin retourné doit avoir un coût (temps de parcours estimé)
+  inférieur au délai maximal $D_{\max}$ défini par le protocole médical.
+  $$
+  \text{coût}(P^*) \leq D_{\max}
+  $$
+  Si aucun chemin ne respecte $D_{\max}$, le système doit émettre une
+  \textbf{alerte critique} et proposer le chemin le plus court disponible.
+\end{invariant}
+
+\begin{invariant}[Continuité de service]
+  Un recalcul en cours ne doit pas laisser le véhicule sans instruction
+  de navigation. La route en cours reste active jusqu'à la disponibilité
+  du nouveau chemin.
+  $$
+  \forall t : P_{\text{actif}}(t) \neq \emptyset
+  $$
+\end{invariant}
+
+\begin{invariant}[Admissibilité de l'heuristique]
+  L'heuristique $h$ utilisée par A* doit rester admissible après chaque
+  mise à jour des poids, pour garantir l'optimalité du résultat.
+  $$
+  h(n) \leq \frac{d_{\text{euclidienne}}(n, t)}{v_{\max}} \quad \forall n,t
+  $$
+\end{invariant}
+
+\subsection{Contraintes de sécurité opérationnelle}
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Contrainte} & \textbf{Valeur recommandée} & \textbf{Raison} \\
+  \midrule
+  Délai max. recalcul & $< 200$\,ms & Temps réel conducteur \\
+  Fréquence recalcul & toutes les 5\,min & Compromis fraîcheur/charge \\
+  Âge max. des données & $< 15$\,min & Données périmées = risque \\
+  Poids minimal arc & $> 0$ & Éviter les boucles infinies \\
+  Multiplicateur plafond & $\leq 5{,}0$ & Éviter les divergences numériques \\
+  Hauteur de flot ambulance & voie $\geq 3{,}5$\,m & Contrainte physique \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Gestion des données périmées (stale data)}
+
+\begin{alertbox}{Risque : Données de trafic périmées}
+Si la source de données trafic est indisponible (panne réseau, timeout),
+le système doit basculer sur une \textbf{stratégie de repli} :
+\begin{enumerate}
+  \item Utiliser les données historiques moyennes (moyenne de la même
+        heure sur les 30 derniers jours) ;
+  \item Augmenter conservativement tous les multiplicateurs de $+20\,\%$
+        pour compenser l'incertitude ;
+  \item Signaler visuellement à l'opérateur que les données sont
+        estimées, pas mesurées.
+\end{enumerate}
+\end{alertbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+%  SECTION 5 — PRÉSENTATION AU JURY NON TECHNIQUE
+% ═══════════════════════════════════════════════════════════════════
+\section{Communication au jury et aux équipes non techniques}
+
+\subsection{La métaphore du GPS qui écoute la radio}
+
+\begin{jurybox}{Message clé pour le jury}
+  \textbf{Notre moteur de routage fonctionne comme un GPS
+  qui écoute la radio en permanence.}
+
+  \medskip
+  Un GPS classique calcule votre itinéraire une seule fois
+  et vous guide en ligne droite, même si un accident vient de bloquer
+  la route. Notre système, lui, \textbf{réécoute la situation toutes
+  les 5 minutes} et se demande : \og{}Est-ce que le chemin actuel
+  est toujours le plus rapide ?\fg{} Si non, il recalcule et propose
+  une déviation, automatiquement, sans intervention humaine.
+\end{jurybox}
+
+\subsection{Les trois questions que le jury posera}
+
+\paragraph{Question 1 : \og{}Et si le système se trompe ?\fg{}}
+
+\noindent\textbf{Réponse :} Le système ne se trompe pas sur les données
+disponibles — il calcule l'optimal compte tenu de ce qu'il sait. Si les
+données sont imparfaites (capteur défaillant, incident non signalé), nous
+avons un mécanisme de repli conservatif qui surestime délibérément les
+temps de trajet pour rester en sécurité. De plus, le conducteur garde
+\emph{toujours} la main : l'IA suggère, l'humain décide.
+
+\paragraph{Question 2 : \og{}Pourquoi ne pas garder le même chemin jusqu'au bout ?\fg{}}
+
+\noindent\textbf{Réponse :} Parce que la ville est vivante. En 10 minutes,
+un feu de circulation tombe en panne, un camion se gare en double file,
+la pluie rend une route glissante. Un chemin calculé à 08h00 peut devenir
+33\,\% plus lent à 08h10. Pour une ambulance, ces minutes comptent.
+
+\paragraph{Question 3 : \og{}Comment savez-vous que le nouveau chemin est vraiment meilleur ?\fg{}}
+
+\noindent\textbf{Réponse :} L'algorithme A* est prouvé mathématiquement
+optimal : si l'heuristique est admissible (ce que nous garantissons), il
+trouve \emph{toujours} le chemin le moins coûteux parmi tous les chemins
+possibles. Ce n'est pas une heuristique floue — c'est une garantie formelle.
+
+\subsection{Tableau de bord de transparence}
+
+Pour assurer la transparence du système, chaque décision de routage
+doit être accompagnée d'un log structuré :
+
+\begin{center}
+\begin{tabular}{ll}
+  \toprule
+  \textbf{Champ du log} & \textbf{Exemple de valeur} \\
+  \midrule
+  Timestamp de calcul & 2024-11-15 08:07:32 \\
+  Véhicule & Ambulance SAMU-12 \\
+  Chemin retourné & [N1043 $\to$ A22 $\to$ R47 $\to$ N8] \\
+  Coût estimé & 14 min 20 s \\
+  Multiplicateurs appliqués & $\mu_1 = 1.8,\; \mu_2 = 1.2,\; \mu_3 = 2.1$ \\
+  Pluie détectée & Oui ($\rho = 1.25$) \\
+  Arcs filtrés (passabilité) & 3 arcs résidentiels exclus \\
+  Raison du recalcul & Minuterie 5 min \\
+  Chemin précédent & [N1043 $\to$ B5 $\to$ N8] \\
+  Gain estimé & +2 min 40 s \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Schéma de présentation synthétique}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  layer/.style={rectangle, rounded corners=5pt, minimum width=10cm,
+                minimum height=1.2cm, align=center, font=\small\bfseries},
+  arr/.style={-{Latex[length=3mm]}, thick, gray}
+]
+  \node[layer, fill=urgence!15, draw=urgence] (l1) at (0,0)
+    {Couche données : GPS, capteurs trafic, météo, signalements};
+  \node[layer, fill=theorie!15, draw=theorie] (l2) at (0,-1.8)
+    {Couche poids : mise à jour des multiplicateurs $\mu$, $\rho$, $\phi$};
+  \node[layer, fill=attention!15, draw=attention] (l3) at (0,-3.6)
+    {Couche algorithme : A* avec poids dynamiques + filtres passabilité};
+  \node[layer, fill=pratique!15, draw=pratique] (l4) at (0,-5.4)
+    {Couche décision : chemin optimal + logs d'audit + alertes};
+  \node[layer, fill=gray!10, draw=gray] (l5) at (0,-7.2)
+    {Couche conducteur : instructions GPS + override manuel};
+
+  \draw[arr] (l1) -- (l2);
+  \draw[arr] (l2) -- (l3);
+  \draw[arr] (l3) -- (l4);
+  \draw[arr] (l4) -- (l5);
+\end{tikzpicture}
+\caption{Architecture en couches du moteur de routage d'urgence.
+  Chaque couche est indépendante et testable séparément.}
+\end{figure}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+%  SECTION 6 — SYNTHÈSE ET FEUILLE DE ROUTE
+% ═══════════════════════════════════════════════════════════════════
+\section{Synthèse et feuille de route}
+
+\subsection{Récapitulatif des points clés}
+
+\begin{center}
+\begin{tabular}{>{\bfseries}p{3.5cm}p{9cm}}
+  \toprule
+  Concept & Signification opérationnelle \\
+  \midrule
+  Graphe pondéré & Modèle numérique du réseau routier avec temps de trajet \\
+  Poids dynamique & Chaque arc a un coût qui évolue avec le trafic, la météo \\
+  Vieillissement & Un chemin calculé il y a 5 min peut ne plus être optimal \\
+  A* dynamique & Recalcul optimal toutes les 5 min (ou sur événement) \\
+  Passabilité & Filtre selon le type de véhicule (ambulance $\neq$ camion) \\
+  Invariants & Propriétés de sécurité garanties en toute circonstance \\
+  Auditabilité & Chaque décision est loguée et explicable \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Extensions futures}
+
+\begin{enumerate}
+  \item \textbf{Apprentissage des multiplicateurs} — utiliser un modèle
+        LSTM pour prédire $\mu(t+\Delta t)$ au lieu de l'interpolation
+        linéaire ;
+  \item \textbf{Routage multi-véhicules} — coordination de plusieurs
+        ambulances pour éviter les conflits de ressources (arc surchargé
+        par plusieurs véhicules d'urgence simultanément) ;
+  \item \textbf{Intégration temps réel} — connexion directe aux APIs
+        de trafic (HERE, TomTom, OpenStreetMap Overpass) pour des
+        multiplicateurs à la minute ;
+  \item \textbf{D* Lite} — remplacement de A* par D* Lite pour des
+        recalculs encore plus rapides en ne retraitant que les arcs modifiés ;
+  \item \textbf{Certification ISO 26262 / IEC 61508} — validation formelle
+        des invariants de sécurité pour homologation dans un système
+        critique embarqué.
+\end{enumerate}
+
+% ═══════════════════════════════════════════════════════════════════
+%  CONCLUSION
+% ═══════════════════════════════════════════════════════════════════
+\section*{Conclusion}
+\addcontentsline{toc}{section}{Conclusion}
+
+Le moteur de routage d'urgence présenté dans ce document repose sur des
+fondements algorithmiques solides (A* avec garantie d'optimalité) et une
+modélisation réaliste des contraintes opérationnelles (trafic, météo,
+passabilité, délais). La stratégie de \textbf{vieillissement des poids
+toutes les 5 minutes} assure que le système reste aligné avec la réalité
+du terrain, tandis que les \textbf{invariants métier} garantissent la
+sécurité en toute circonstance.
+
+\medskip
+La conception est \textbf{transparente} : chaque décision est loguée,
+chaque paramètre est explicable, et le conducteur conserve toujours la
+primauté sur les suggestions du système. Ce n'est pas un oracle opaque
+— c'est un \emph{assistant calculateur} au service des équipes d'urgence.
+
+\medskip
+Les données réelles de Yaoundé (2\,400 relevés de trafic sur 6 types de
+voies, multiplicateurs allant jusqu'à $\times 3{,}33$) confirment la
+pertinence de l'approche : les conditions de circulation urbaine sont
+suffisamment variables pour justifier un recalcul fréquent, et suffisamment
+structurées pour être modélisées efficacement par l'algorithme proposé.
+
+\vspace{2em}
+\begin{center}
+{\color{urgence}\rule{0.5\linewidth}{1pt}}\\[0.5em]
+{\itshape \og{}L'optimal d'aujourd'hui est le sous-optimal de demain.\\
+Le recalcul n'est pas une faiblesse — c'est la définition de l'intelligence adaptative.\fg{}}\\[0.5em]
+{\color{urgence}\rule{0.5\linewidth}{1pt}}
+\end{center}
+
+\end{document}
