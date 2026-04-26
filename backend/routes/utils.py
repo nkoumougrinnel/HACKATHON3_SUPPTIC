@@ -7,6 +7,10 @@ from scipy.spatial import cKDTree
 import threading
 import time
 
+# Configuration globale
+DEFAULT_SPEED = 45.0  # Vitesse par défaut 45 km/h au lieu de 50
+BLOCKED_EDGES = set()  # Ensemble des arcs bloqués: (u, v) ou (v, u)
+
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / 'data'
 YAOUNDE_ROADS_GEOJSON = DATA_DIR / "export.geojson"
 TRAFFIC_CSV = DATA_DIR / "traffic_by_segment_hour.csv"
@@ -89,7 +93,7 @@ def build_graph(geojson_data):
 def get_traffic_data(traffic_df, road_id, road_type, hour):
     """Récupère les données de trafic pour un segment via road_id puis road_type"""
     default = {
-        'avg_speed_kmh': 50.0,
+        'avg_speed_kmh': DEFAULT_SPEED,
         'travel_time_multiplier': 1.0,
         'congestion_level': 0.0,
         'passable_ambulance': 'oui',
@@ -108,16 +112,37 @@ def get_traffic_data(traffic_df, road_id, road_type, hour):
 
     return default
 
-def get_weight_dynamic(weight_km, traffic_data, vehicle_type):
+def block_road(u, v):
+    """Ajoute un arc (u, v) à la liste des routes bloquées"""
+    u_tuple = tuple(u) if isinstance(u, (list, tuple)) else u
+    v_tuple = tuple(v) if isinstance(v, (list, tuple)) else v
+    BLOCKED_EDGES.add((u_tuple, v_tuple))
+    BLOCKED_EDGES.add((v_tuple, u_tuple))  # bidirectional
+
+def unblock_road(u, v):
+    """Enlève un arc (u, v) de la liste des routes bloquées"""
+    u_tuple = tuple(u) if isinstance(u, (list, tuple)) else u
+    v_tuple = tuple(v) if isinstance(v, (list, tuple)) else v
+    BLOCKED_EDGES.discard((u_tuple, v_tuple))
+    BLOCKED_EDGES.discard((v_tuple, u_tuple))
+
+def get_weight_dynamic(weight_km, traffic_data, vehicle_type, u=None, v=None, rain=False):
     """Calcule le poids dynamique en secondes basé sur traffic_data"""
     if weight_km == float('inf'):
         return float('inf')
     
+    # Vérifier si l'arc est bloqué
+    if u is not None and v is not None:
+        u_tuple = tuple(u) if isinstance(u, (list, tuple)) else u
+        v_tuple = tuple(v) if isinstance(v, (list, tuple)) else v
+        if (u_tuple, v_tuple) in BLOCKED_EDGES:
+            return float('inf')
+    
     base_time_hours = weight_km / traffic_data['avg_speed_kmh']
     time_hours = base_time_hours * traffic_data['travel_time_multiplier']
 
-    # Pénalité pluie
-    if traffic_data.get('rain') == 'oui':
+    # Pénalité pluie (paramètre ou données)
+    if rain or traffic_data.get('rain') == 'oui':
         time_hours *= 1.2
 
     # Congestion extrême
@@ -169,7 +194,7 @@ class WeightCache:
             traffic_data = traffic_by_road.get(road_id)
             if traffic_data is None:
                 traffic_data = get_traffic_data(self.traffic_df, road_id, edge_data.get('road_type'), hour)
-            weight = get_weight_dynamic(edge_data['weight_km'], traffic_data, vehicle_type)
+            weight = get_weight_dynamic(edge_data['weight_km'], traffic_data, vehicle_type, u=u, v=v, rain=False)
             self.G[u][v]['weight'] = weight
             self.cache[(u, v)] = weight
 
@@ -221,17 +246,40 @@ def get_nearest_node(G, kdtree, coord):
     except Exception:
         raise ValueError("Aucun nœud voisin trouvé dans le graphe")
 
-def compute_route_astar(G, start, end, current_hour=12, vehicle_type='ambulance'):
-    """Calcule le chemin optimal avec A* et poids dynamiques"""
+def compute_route_astar(G, start, end, current_hour=12, vehicle_type='ambulance', rain=False, current_pos=None):
+    """Calcule le chemin optimal avec A* et poids dynamiques
+    
+    Args:
+        G: Graphe NetworkX
+        start: Coordonnées de départ [lon, lat]
+        end: Coordonnées de destination [lon, lat]
+        current_hour: Heure actuelle (0-23)
+        vehicle_type: Type de véhicule ('ambulance', 'firetruck', 'police')
+        rain: Booléen indiquant s'il pleut
+        current_pos: Position actuelle [lon, lat] (si fourni, redémarrer d'ici)
+    """
     _weight_cache.ensure_updated(current_hour, vehicle_type)
 
-    # Trouver les nœuds les plus proches
-    source = get_nearest_node(G, _kdtree, start)
+    # Si current_pos est fourni, redémarrer d'ici
+    if current_pos is not None:
+        source = get_nearest_node(G, _kdtree, current_pos)
+    else:
+        source = get_nearest_node(G, _kdtree, start)
+    
     target = get_nearest_node(G, _kdtree, end)
 
-    # Heuristique : distance géodésique / vitesse max (50 km/h) en secondes
+    # Si rain=True, recalculer les poids des arêtes avec la pénalité
+    if rain:
+        for u, v, edge_data in G.edges(data=True):
+            road_id = edge_data.get('road_id')
+            road_type = edge_data.get('road_type')
+            traffic_data = get_traffic_data(_weight_cache.traffic_df, road_id, road_type, current_hour)
+            weight = get_weight_dynamic(edge_data['weight_km'], traffic_data, vehicle_type, u=u, v=v, rain=True)
+            G[u][v]['weight'] = weight
+
+    # Heuristique : distance géodésique / vitesse max (DEFAULT_SPEED km/h) en secondes
     def heuristic(u, v):
-        return haversine_distance(u, v) / 50 * 3600
+        return haversine_distance(u, v) / DEFAULT_SPEED * 3600
 
     return nx.astar_path(
         G,
