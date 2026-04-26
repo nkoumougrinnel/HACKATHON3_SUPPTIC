@@ -10,14 +10,6 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faAmbulance,
-  faTruck,
-  faShieldHalved,
-  faCloudRain,
-  faRoad,
-} from "@fortawesome/free-solid-svg-icons";
 
 // Fix pour les icônes Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -42,21 +34,21 @@ const VEHICLES = [
     key: "ambulance",
     label: "Ambulance",
     color: "#E63946",
-    icon: faAmbulance,
+    icon: "🚑",
     desc: "Vitesse, accès hôpitaux",
   },
   {
     key: "firetruck",
     label: "Pompier",
     color: "#FF9C1C",
-    icon: faTruck,
+    icon: "🚒",
     desc: "Zones incendie, hydrants",
   },
   {
     key: "police",
     label: "Police",
     color: "#1D4ED8",
-    icon: faShieldHalved,
+    icon: "🚓",
     desc: "Interception, zones à risque",
   },
 ];
@@ -80,7 +72,6 @@ function App() {
     null,
   );
   const [destCoords, setDestCoords] = useState<[number, number] | null>(null);
-  const [rain, setRain] = useState(false);
 
   const initialCenter: [number, number] = [3.8667, 11.5167];
   const center = departCoords || initialCenter;
@@ -110,13 +101,7 @@ function App() {
       const response = await fetch("http://localhost:8000/api/route/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          start, 
-          end, 
-          hour: 12, 
-          vehicle_type: vehicle,
-          rain: rain
-        }),
+        body: JSON.stringify({ start, end, hour: 12, vehicle_type: vehicle }),
       });
       const data: RouteResponse = await response.json();
       if (data.error) {
@@ -151,11 +136,13 @@ function App() {
               type="button"
               key={v.key}
               className={`vehicle-btn${vehicle === v.key ? " selected" : ""}`}
-              style={vehicle === v.key ? undefined : { color: v.color }}
+              style={{
+                background: vehicle === v.key ? v.color : "#f5f5f5",
+                color: vehicle === v.key ? "#fff" : v.color,
+              }}
               onClick={() => setVehicle(v.key as VehicleType)}
             >
-              <FontAwesomeIcon icon={v.icon} className="vehicle-icon" />
-              <span>{v.label}</span>
+              <span className="vehicle-icon">{v.icon}</span> {v.label}
             </button>
           ))}
         </div>
@@ -163,7 +150,6 @@ function App() {
           <label htmlFor="depart">Départ</label>
           <input
             id="depart"
-            className="input-field"
             type="text"
             value={depart}
             onChange={(e) => setDepart(e.target.value)}
@@ -176,7 +162,6 @@ function App() {
           <label htmlFor="destination">Destination</label>
           <input
             id="destination"
-            className="input-field"
             type="text"
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
@@ -184,18 +169,6 @@ function App() {
             required
             autoComplete="off"
           />
-        </div>
-        <div className="form-group rain-toggle">
-          <label htmlFor="rain">
-            <input
-              id="rain"
-              type="checkbox"
-              checked={rain}
-              onChange={(e) => setRain(e.target.checked)}
-            />
-            <FontAwesomeIcon icon={faCloudRain} className="rain-icon" />
-            Il pleut
-          </label>
         </div>
         <button className="songo-primary" type="submit" disabled={loading}>
           {loading ? "Calcul en cours..." : "Trouver l’itinéraire"}
@@ -238,7 +211,7 @@ function App() {
       {routePath.length > 0 && (
         <div className="songo-summary">
           <span className="songo-summary-icon">
-            <FontAwesomeIcon icon={faRoad} />
+            {VEHICLES.find((v) => v.key === vehicle)?.icon}
           </span>
           <span>Itinéraire trouvé ({routePath.length} points)</span>
         </div>

@@ -1,0 +1,637 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Packages ────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, decorations.markings}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{mdframed}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{caption}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+% ─── Colors ──────────────────────────────────────────────────────────────────
+\definecolor{urgence}{RGB}{180,30,30}
+\definecolor{theorie}{RGB}{30,80,160}
+\definecolor{pratique}{RGB}{20,130,80}
+\definecolor{attention}{RGB}{200,120,0}
+\definecolor{bleuléger}{RGB}{230,240,255}
+\definecolor{vertléger}{RGB}{230,248,238}
+\definecolor{twist}{RGB}{100,80,170}
+\definecolor{twistléger}{RGB}{235,230,255}
+\definecolor{grisfonce}{RGB}{80,80,80}
+\definecolor{grisclair}{RGB}{245,245,245}
+
+% ─── Custom environments ──────────────────────────────────────────────────────
+\newtcolorbox{defbox}[1]{
+  colback=bleuléger, colframe=theorie, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{metierbox}[1]{
+  colback=vertléger, colframe=pratique, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{alertbox}[1]{
+  colback=yellow!10, colframe=attention, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{jurybox}[1]{
+  colback=red!5, colframe=urgence, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{twistbox}[1]{
+  colback=twistléger, colframe=twist, fonttitle=\bfseries\large,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{codebox}[1]{
+  colback=grisclair, colframe=theorie!50, fonttitle=\bfseries\small,
+  title={#1}, breakable, sharp corners=south,
+  fontupper=\ttfamily\small
+}
+
+% ─── Theorem styles ───────────────────────────────────────────────────────────
+\theoremstyle{definition}
+\newtheorem{definition}{Définition}[section]
+\newtheorem{propriete}{Propriété}[section]
+\newtheorem{invariant}{Invariant métier}[section]
+
+\theoremstyle{remark}
+\newtheorem{remarque}{Remarque}[section]
+\newtheorem{exemple}{Exemple}[section]
+
+% ─── Hyperref setup ───────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=theorie,
+  urlcolor=urgence,
+  pdftitle={Twist 10 — Réseau coupé, routage avec dernières données},
+  pdfauthor={Système de routage critique},
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ═══════════════════════════════════════════════════════════════════
+%  COUVERTURE
+% ═══════════════════════════════════════════════════════════════════
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\color{twist}\rule{\linewidth}{2pt}}\\[0.5em]
+  {\Huge\bfseries Twist 10}\\[0.4em]
+  {\Large\bfseries Le réseau est coupé, mais le centre de dispatch\\[0.2em]
+  doit continuer à router avec les dernières données connues}\\[0.4em]
+  {\color{twist}\rule{\linewidth}{2pt}}\\[2em]
+
+  % Schéma illustratif : centre déconnecté, véhicules en autonomie
+  \begin{tikzpicture}[
+    centre/.style={rectangle, rounded corners, draw=theorie, fill=bleuléger,
+                   minimum width=2.5cm, minimum height=1.2cm, font=\small\bfseries},
+    veh/.style={rectangle, rounded corners, draw=pratique, fill=vertléger,
+                minimum width=1.8cm, minimum height=0.8cm, font=\small},
+    coupure/.style={-{Latex[length=3mm]}, urgence, thick, dashed},
+    data/.style={-{Latex[length=2mm]}, attention, thick},
+    scale=1.0
+  ]
+    \node[centre] (dispatch) at (0,0) {Centre de dispatch};
+    \node[veh] (V1) at (-3,-2) {Véhicule 1};
+    \node[veh] (V2) at (0,-2) {Véhicule 2};
+    \node[veh] (V3) at (3,-2) {Véhicule 3};
+
+    \draw[coupure] (dispatch) -- node[above, sloped, font=\tiny\bfseries\color{urgence}] {COUPURE} (V1);
+    \draw[coupure] (dispatch) -- (V2);
+    \draw[coupure] (dispatch) -- (V3);
+
+    \draw[data, double] (V1) -- node[below, font=\tiny] {cache local} (V2);
+    \draw[data, double] (V2) -- node[below, font=\tiny] {cache local} (V3);
+    \draw[data, double] (V3) to[bend left=20] node[right, font=\tiny] {re-synchro} (V1);
+
+    \node[font=\tiny\itshape, color=pratique] at (-1, -3.5)
+      {Véhicules continuent avec dernières données connues + échanges pair-à-pair};
+  \end{tikzpicture}\\[1.5em]
+
+  {\large Note technique — Résilience, modes dégradés et synchronisation différée}\\[1em]
+  {\large\color{gray} Extension du moteur de routage pour la continuité de service}\\[2.5em]
+
+  \begin{tabular}{rl}
+    \textbf{Sujet :}        & Sujet 07 — Hackverse 2026 \\
+    \textbf{Twist :}        & \#10 — Panne réseau complète \\
+    \textbf{Durée typique :} & 10 à 30 minutes (micro-coupure) ou heures (catastrophe) \\
+    \textbf{Principe :}     & Ne jamais bloquer une mission à cause d’un réseau absent \\
+  \end{tabular}
+
+  \vfill
+  {\small\color{gray} Document pédagogique — Présentation jury et équipe technique}
+\end{titlepage}
+
+% ═══════════════════════════════════════════════════════════════════
+\tableofcontents
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section*{Introduction}
+\addcontentsline{toc}{section}{Introduction}
+
+Tous les twists précédents supposaient que le système d’aide à la décision
+avait accès à des données centralisées actualisées en temps réel
+(trafic, météo, fermetures, sens interdits, etc.). Mais cette hypothèse
+tombe en panne lorsque \textbf{le réseau de communication est coupé}.
+
+\begin{twistbox}{Twist 10 — Le système doit fonctionner en mode dégradé}
+Une panne réseau peut survenir à tout moment : fibre coupée par des travaux,
+antenne relais saturée, cyberattaque, ou simple panne du datacenter.
+Le centre de dispatch ne reçoit plus de mise à jour des véhicules, et
+les véhicules ne reçoivent plus d’instructions centralisées.
+
+Pourtant, les interventions ne s’arrêtent pas. Une ambulance engagée
+sur la route doit continuer à naviguer. Un nouveau départ de mission
+doit être possible, même sans connexion.
+
+\medskip
+Le twist 10 impose de concevoir un système \textbf{résilient} :
+\begin{itemize}
+  \item Chaque véhicule conserve une copie locale du graphe routier
+        et des dernières données connues (cache).
+  \item En cas de coupure, il passe en \textbf{mode autonome} :
+        il calcule ses propres itinéraires avec ces données figées.
+  \item Lorsque la connexion revient, les véhicules et le centre
+        \textbf{synchronisent} les changements d’état et les nouvelles
+        observations terrain.
+\end{itemize}
+\end{twistbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Définition du problème — modes de fonctionnement}
+
+\subsection{Architecture nominale (avec réseau)}
+
+Dans le fonctionnement normal, le centre de dispatch centralise :
+\begin{itemize}
+  \item les mises à jour de trafic (multiplicateurs $\mu$, fermetures) ;
+  \item les prévisions météo ($\mathbf{p}(\theta)$) ;
+  \item la position GPS des véhicules (toutes les 30 s) ;
+  \item les alertes terrain (conducteurs, capteurs).
+\end{itemize}
+Le centre calcule les affectations (Twist 9) et les itinéraires, puis
+les transmet aux véhicules. Chaque véhicule reçoit des instructions
+et suit le chemin. En retour, il envoie sa position et ses observations.
+
+\subsection{Panne réseau — types de coupure}
+
+Deux cas principaux :
+
+\begin{enumerate}[leftmargin=2em, itemsep=4pt]
+  \item \textbf{Coupure totale centre ↔ véhicules} : plus aucun message
+        ne passe. Le centre perd la connaissance des positions ; les
+        véhicules ne reçoivent plus de nouveaux itinéraires ni de mises
+        à jour des conditions.
+  \item \textbf{Coupure uniquement montante ou descendante} : par exemple,
+        les véhicules peuvent envoyer leur position (message court) mais
+        ne reçoivent pas de réponse (liaison asymétrique). Le centre
+        voit les véhicules mais ne peut pas leur parler.
+\end{enumerate}
+
+\subsection{Niveaux de mode dégradé}
+
+\begin{defbox}{Niveaux de résilience}
+\begin{itemize}
+  \item \textbf{Niveau 0 (nominal)} : connexion OK, synchronisation temps réel.
+  \item \textbf{Niveau 1 (coupure < 5 min)} : les véhicules continuent
+        avec le dernier itinéraire reçu, sans tentative de recalcul.
+  \item \textbf{Niveau 2 (coupure prolongée)} : les véhicules passent
+        en mode autonome complet (cache local, recalcul local).
+  \item \textbf{Niveau 3 (coupure + changement de mission requis)} :
+        le véhicule utilise son cache et son A* embarqué pour produire
+        un itinéraire de repli, même sans validation centrale.
+\end{itemize}
+\end{defbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Cache embarqué — les dernières données connues}
+
+\subsection{Contenu minimal du cache véhicule}
+
+Chaque véhicule maintient une base locale contenant :
+
+\begin{center}
+\begin{tabular}{ll}
+  \toprule
+  \textbf{Élément} & \textbf{Âge maximal admissible (avant mode dégradé)} \\
+  \midrule
+  Graphe routier orienté (Twist 7) & 24 h (structure statique) \\
+  Multiplicateurs $\mu$ par heure & 2 h (trafic horaire typique) \\
+  Fermetures connues (Twist 4) & 15 min \\
+  Prévision météo $\mathbf{p}(\theta)$ & 30 min \\
+  Score $\kappa(z)$ (Twist 8) & 6 h \\
+  Affectation en cours & instantanée \\
+  Destination courante & instantanée \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+Le cache est mis à jour périodiquement (toutes les minutes en fond)
+lorsque le réseau est disponible. Un champ \texttt{timestamp}
+accompagne chaque donnée.
+
+\subsection{Stratégie de vieillissement des données}
+
+En mode dégradé, le système n’a plus accès aux mises à jour fraîches.
+Il doit continuer à router avec des données vieillissantes, mais en
+intégrant une \textbf{pénalité de confiance} dans les poids.
+
+\begin{defbox}{Poids avec vieillissement et incertitude de connexion}
+Le poids effectif d’un arc à l’instant $t$, alors que la dernière
+mise à jour date de $t_0$ (avec $\Delta = t - t_0$), devient :
+\[
+  w_{\text{mode dégradé}}(e, t) = w(e, t_0) \cdot (1 + \alpha \cdot \Delta)
+\]
+où $\alpha$ est un coefficient d’augmentation de l’incertitude
+(par exemple $\alpha = 0.02$ par minute, soit +2\% de pénalité
+par minute d’absence de mise à jour). Au bout de 10 minutes,
+le poids est majoré de 20\%.
+\end{defbox}
+
+Cette pénalité reflète que les données deviennent moins fiables.
+Si la coupure dure trop longtemps, le système finit par privilégier
+les axes dont le trafic est structurellement faible (car leur
+dégradation relative est moindre).
+
+\subsection{Pseudocode de routage local en mode dégradé}
+
+\begin{algorithm}[H]
+\caption{Routage local avec cache (embarqué)}
+\begin{algorithmic}[1]
+\Require Cache local $C$ (contient graphe $G_0$, multiplicateurs $\mu_0$,
+         météo $p_0$, etc.), destination $d$, position $p$, instant $t$
+\If{réseau disponible}
+    \State Utiliser les données centrales à jour
+\Else
+    \State $\Delta \gets t - C.\text{timestamp}$
+    \If{$\Delta < \text{seuil\_critique}$ (par défaut 5 min)}
+        \State Utiliser cache sans pénalité (ou pénalité légère)
+    \Else
+        \State Appliquer facteur de vieillissement $(1 + \alpha\Delta)$
+            sur tous les poids $w(e, t_0)$
+    \EndIf
+    \State Exécuter A* robuste (Twist 6) avec les données du cache
+          et les poids modifiés
+\EndIf
+\State \Return itinéraire
+\end{algorithmic}
+\end{algorithm}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Synchronisation différée — la reprise du réseau}
+
+\subsection{Événements à synchroniser}
+
+Lorsque la connexion est rétablie, le centre et les véhicules
+doivent échanger les événements survenus pendant la coupure :
+
+\begin{itemize}
+  \item \textbf{Du véhicule vers le centre} :
+    \begin{itemize}
+      \item position GPS horodatée (pour reconstruction de trajectoire) ;
+      \item nouvelles routes découvertes (arcs fantômes confirmés,
+            cf. Twist 8) ;
+      \item temps réels de parcours des arcs (pour calibration) ;
+      \item incidents constatés (accidents, routes bloquées) ;
+      \item changement de mission effectué localement (si décision autonome).
+    \end{itemize}
+  \item \textbf{Du centre vers le véhicule} :
+    \begin{itemize}
+      \item mises à jour de trafic accumulées (nouveaux multiplicateurs) ;
+      \item fermetures survenues ;
+      \item nouvelles affectations (si le centre a continué à tourner) ;
+      \item alertes météo fraîches.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Résolution des conflits}
+
+Deux scénarios de conflit peuvent apparaître :
+
+\begin{enumerate}[leftmargin=2em, itemsep=4pt]
+  \item \textbf{Le véhicule a modifié sa mission sans accord central.}
+        Le centre compare sa propre estimation (basée sur des données
+        périmées) avec le compte-rendu du véhicule. Par défaut, la
+        décision terrain prévaut, mais l’incident est journalisé pour
+        audit.
+  \item \textbf{Le centre a émis un ordre pendant la coupure (non reçu).}
+        À la reprise, le centre renvoie l’ordre. Si le véhicule a déjà
+        effectué une action incompatible, l’ordre est annulé et une
+        explication est générée.
+\end{enumerate}
+
+\begin{metierbox}{Règle de réconciliation}
+Le système applique une \textbf{chronologie vectorielle} : chaque
+entité (centre, véhicule) incrémente un compteur d’événements.
+Lors de la synchronisation, on fusionne les événements dans l’ordre
+temporel global (basé sur les horodatages des machines, corrigés
+par un protocole NTP léger). En cas d’égalité, la version du véhicule
+est prioritaire pour les observations terrain ; celle du centre pour
+les directives stratégiques.
+\end{metierbox}
+
+\subsection{Algorithmes de synchronisation}
+
+\begin{algorithm}[H]
+\caption{Synchronisation après coupure (côté centre)}
+\begin{algorithmic}[1]
+\Require Connexion rétablie avec véhicule $v$
+\State $v.\text{sync\_request}()$
+\State $v$ envoie : $( \text{positions}[t_1..t_2],\;
+       \text{incidents\_observés},\; \text{nouvelles\_routes},\;
+       \text{mission\_locale} )$
+\State Le centre met à jour sa base avec ces informations
+\State Le centre envoie à $v$ les mises à jour globales 
+       (trafic, météo, affectations)
+\State \textbf{Résolution des conflits} (cf. ci-dessus)
+\State $v$ recalcule si nécessaire son itinéraire avec les nouvelles données
+\State Journaliser la fin de la coupure et la durée
+\end{algorithmic}
+\end{algorithm}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Scénario : coupure lors d’un incident multiple}
+
+\subsection{Contexte — deux ambulances, trois incidents, réseau coupé}
+
+Reprenons le scénario du Twist 9. À 14h22, trois incidents vitaux
+sont signalés. Le centre a affecté : $V_1$ vers Bastos (5,8 min),
+$V_2$ vers Bépanda (7,2 min), Mvog-Mbi en attente (sera pris par
+$V_1$ après Bastos). À 14h25, alors que $V_1$ est à mi-chemin, une
+coupure totale réseau survient.
+
+\subsection{Comportement des véhicules en mode dégradé}
+
+\textbf{Véhicule $V_1$ (vers Bastos)} : Il a reçu l’itinéraire complet
+avant la coupure. Il continue à suivre le chemin prévu. Son cache
+local contient les données de trafic de 14h22. À 14h27, il arrive à
+Bastos, prend en charge le patient. Il doit maintenant décider de
+partir vers Mvog-Mbi (comme planifié) ou de faire autre chose. Comme
+il est en mode dégradé, il utilise son cache pour calculer le trajet
+Bastos → Mvog-Mbi (temps estimé 6,5 min). Il exécute cette instruction.
+
+\textbf{Véhicule $V_2$ (vers Bépanda)} : Il continue également. Il
+arrive à Bépanda à 14h29. Son cache lui indique que le centre avait
+prévu que $V_1$ prenne Mvog-Mbi. Il reste donc sur place (ou retourne
+vers le centre) en attendant la reprise réseau.
+
+\subsection{Retour du réseau à 14h35}
+
+À 14h35, la connexion revient. Le centre reçoit les positions :
+$V_1$ à Mvog-Mbi (arrivée 14h33), $V_2$ à Bépanda (arrivée 14h29,
+patient pris en charge). Le centre détecte que $V_1$ a suivi le plan
+initial. Aucun conflit. Les données de trafic sont mises à jour
+(congestion à Bastos entre-temps). $V_1$ reçoit l’ordre de retour
+vers l’hôpital. $V_2$ reçoit un nouvel incident (non traité ici).
+
+\begin{metierbox}{Leçon du scénario}
+La coupure n’a pas arrêté les interventions : les véhicules ont
+poursuivi avec leur dernier plan valide. L’absence de recalcul
+pendant 10 minutes n’a pas dégradé significativement la performance
+car les conditions n’avaient que peu changé (heure creuse). En cas
+de coupure longue, le cache vieillissant pénaliserait les axes
+connus pour leur variabilité, incitant les véhicules à prendre
+des itinéraires plus sûrs.
+\end{metierbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Invariants métier et cas limites}
+
+\begin{invariant}[Continuité absolue du guidage]
+Aucune panne réseau ne doit entraîner l’absence d’itinéraire pour
+un véhicule déjà en mission. Le cache local garantit qu’au moins
+un chemin (potentiellement sous-optimal) est toujours disponible.
+\end{invariant}
+
+\begin{invariant}[Détection de l’absence de réseau]
+Le système détecte la coupure en moins de 30 secondes (timeout
+sur les messages keep-alive) et bascule automatiquement en mode
+dégradé. L’opérateur est informé visuellement.
+\end{invariant}
+
+\begin{invariant}[Réconciliation non destructive]
+Aucune donnée terrain (nouvelle route, temps réel) collectée pendant
+la coupure n’est perdue lors de la synchronisation. Les données
+centrales plus récentes peuvent écraser le cache, mais les observations
+sont conservées pour l’historique et l’apprentissage.
+\end{invariant}
+
+\subsection{Cas limite : coupure très longue (> 2 heures)}
+
+Si la coupure dépasse 2 heures, le cache devient très périmé. Le
+système applique alors une stratégie de \textbf{repli maximal} :
+\begin{itemize}
+  \item Tous les poids sont multipliés par un facteur uniforme de $1 + \alpha \cdot \Delta_{\max}$
+        (plafonné à 3,0).
+  \item Les arcs fantômes (Twist 8) sont désactivés par défaut
+        (car leur probabilité d’existence est trop incertaine).
+  \item Le conducteur reçoit une notification : « Données très
+        anciennes — prudence accrue. Suivre la route si possible. »
+\end{itemize}
+
+\subsection{Cas limite : coupure asymétrique (envoi OK, réception KO)}
+
+Le véhicule continue à envoyer sa position, mais ne reçoit pas
+d’instructions. Le centre voit les positions mais ne peut pas
+communiquer. Dans ce cas, le centre enregistre les ordres qu’il
+aurait voulu envoyer. Dès que la liaison descendante est rétablie,
+les ordres sont transmis. Pendant la coupure, le véhicule fonctionne
+en mode autonome comme décrit.
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Implémentation dans le moteur existant}
+
+\subsection{Nouveaux composants}
+
+\begin{center}
+\begin{tabular}{>{\ttfamily}p{4cm} p{9cm}}
+  \toprule
+  \textbf{Fichier} & \textbf{Rôle} \\
+  \midrule
+  resilience/cache.py &
+    Gestion du cache embarqué : sérialisation, horodatage, politique
+    d’expulsion (LRU), rechargement périodique. \\[0.4em]
+  resilience/network\_monitor.py &
+    Surveillance de la connexion (ping, heartbeat, timeout).
+    Change l’état du système entre \texttt{NOMINAL}, \texttt{DEGRADE\_LIGHT},
+    \texttt{DEGRADE\_FULL}. \\[0.4em]
+  resilience/stale\_weight.py &
+    Implémente la fonction de pénalité $(1 + \alpha \Delta)$ pour
+    les poids en mode dégradé. \\[0.4em]
+  resilience/sync.py &
+    Protocole de synchronisation après coupure : échange de diffs,
+    résolution de conflits, mise à jour des bases. \\[0.4em]
+  routing/algorithm.py &
+    Ajout d’un paramètre \texttt{use\_cache\_if\_disconnected=True}
+    dans \texttt{compute\_route}. \\[0.4em]
+  api/views.py &
+    Nouvel endpoint \texttt{/api/status/} pour interroger l’état
+    du réseau et la fraîcheur du cache. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Exemple d’état du cache dans l’interface}
+
+\begin{verbatim}
+{
+  "network_status": "DEGRADE_FULL",
+  "last_contact_center_sec": 187,
+  "cache_age": {
+    "graph": "2026-04-26T08:00:00Z (age 2h)",
+    "traffic": "2026-04-26T09:45:00Z (age 15 min)",
+    "weather": "2026-04-26T10:00:00Z (age 0 min - fresh)",
+    "closures": "2026-04-26T09:30:00Z (age 30 min)"
+  },
+  "stale_penalty_factor": 1.30,
+  "autonomous_mode": true
+}
+\end{verbatim}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Communication au jury}
+
+\begin{jurybox}{Message clé pour le jury}
+\textbf{Le réseau peut tomber, mais pas les services d’urgence.}
+
+\medskip
+Notre système n’a pas un seul point de fragilité. Chaque véhicule
+embarque une copie locale des données essentielles. En cas de coupure,
+il continue à naviguer de façon autonome, en pénalisant prudemment
+les informations vieillissantes. Quand la connexion revient, tout
+se resynchronise sans perte de données. C’est la \textbf{résilience
+par conception}.
+\end{jurybox}
+
+\subsection{Questions anticipées}
+
+\paragraph{Question : « Que se passe-t-il si la coupure dure plusieurs heures
+et que des routes changent de sens (couloirs de bus horaires) ? »}
+\textbf{Réponse :} Les données de sens interdits dynamiques font partie
+du cache. Si le cache a plus de 2 heures, le système applique une
+pénalité conservative et affiche un avertissement au conducteur.
+Dans les faits, les modifications de sens sont rares et connues à
+l’avance ; on peut d’ailleurs coder dans le cache une règle temporelle
+explicite (ex. « sens unique de 7h à 9h ») qui reste valable même
+sans connexion.
+
+\paragraph{Question : « Le cache prend de la place mémoire. Est-ce
+réalisable sur un terminal embarqué ? »}
+\textbf{Réponse :} Oui. Le graphe routier d’une ville de 2 millions
+d’habitants tient en moins de 200 Mo (nœuds et arcs comprimés). Une
+tablette ou un smartphone moderne peuvent stocker cela sans difficulté.
+Les données de trafic horaire (2\,400 lignes) sont négligeables.
+
+\paragraph{Question : « N’y a-t-il pas un risque de split-brain
+(prises de décision contradictoires entre centre et véhicules) ? »}
+\textbf{Réponse :} Tout à fait. C’est pourquoi en mode dégradé,
+les véhicules n’initient \textbf{jamais} de nouvelle mission sans
+ordre central, sauf si cette mission était déjà planifiée (enchaînement
+prévu). Pour les décisions critiques (ex. dérivation d’urgence), ils
+peuvent le faire mais journalisent l’événement. La réconciliation
+post-coupure détecte et résout les conflits par priorité temporelle.
+
+\subsection{Tableau de bord — log de coupure}
+
+\begin{center}
+\begin{tabular}{ll}
+  \toprule
+  \textbf{Champ} & \textbf{Valeur} \\
+  \midrule
+  Début coupure & 2026-04-26 14:25:03 \\
+  Fin coupure   & 2026-04-26 14:35:22 \\
+  Durée         & 10 min 19 s \\
+  Mode véhicule & dégradé complet (autonome) \\
+  Pénalité appliquée & $1 + 0.02 \times 10 = 1.2$ \\
+  Itinéraires recalculés localement & 2 (Bastos → Mvog-Mbi) \\
+  Conflits détectés & 0 \\
+  Données synchronisées : & \\
+  - nouvelles routes & 1 (arc fantôme confirmé) \\
+  - écarts de temps & 3 arcs mis à jour \\
+  - positions GPS & 124 points \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section*{Conclusion}
+\addcontentsline{toc}{section}{Conclusion}
+
+Le twist 10 est le dernier rempart contre la défaillance totale
+du système. Il rappelle une vérité fondamentale : \textbf{un système
+critique ne peut pas dépendre d’une infrastructure réseau fiable
+à 100\%}. Il doit être conçu pour \emph{continuer à servir} même
+quand le monde extérieur se déconnecte.
+
+\medskip
+Trois contributions majeures :
+
+\begin{enumerate}[leftmargin=2em, itemsep=4pt]
+  \item \textbf{Cache embarqué intelligent} : le véhicule garde une
+        copie des dernières données valides et les utilise de façon
+        transparente.
+  \item \textbf{Pénalisation du vieillissement} : plus les données
+        sont âgées, moins on leur fait confiance — sans jamais les
+        jeter brutalement.
+  \item \textbf{Synchronisation différée} : le système rattrape son
+        retard à la moindre opportunité de connexion, sans perte
+        d’observation terrain.
+\end{enumerate}
+
+\medskip
+Ainsi, du twist 1 (graphe statique) au twist 10 (déconnexion), le
+système a appris à gérer l’incertitude sous toutes ses formes :
+trafic, météo, équité cartographique, topologie, rareté des véhicules,
+et enfin panne du réseau. Chaque couche ajoute une brique de robustesse
+pour que le véhicule d’urgence arrive toujours — même dans le pire
+des mondes.
+
+\medskip
+\begin{center}
+  {\color{twist}\rule{0.5\linewidth}{1pt}}\\[0.5em]
+  {\itshape « Le réseau n’est pas une option, c’est une commodité.
+  Un système d’urgence se doit de fonctionner même sans lui. »}\\[0.5em]
+  {\color{twist}\rule{0.5\linewidth}{1pt}}
+\end{center}
+
+\end{document}
