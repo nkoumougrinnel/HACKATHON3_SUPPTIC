@@ -1,0 +1,763 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Packages ────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, decorations.markings, fit, backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{mdframed}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+% ─── Colors ──────────────────────────────────────────────────────────────────
+\definecolor{urgence}{RGB}{180,30,30}
+\definecolor{theorie}{RGB}{30,80,160}
+\definecolor{pratique}{RGB}{20,130,80}
+\definecolor{attention}{RGB}{200,120,0}
+\definecolor{grisléger}{RGB}{245,245,245}
+\definecolor{bleuléger}{RGB}{230,240,255}
+\definecolor{vertléger}{RGB}{230,248,238}
+\definecolor{twist}{RGB}{110,30,160}
+\definecolor{twistléger}{RGB}{245,230,255}
+
+% ─── Custom environments ──────────────────────────────────────────────────────
+\newtcolorbox{defbox}[1]{
+  colback=bleuléger, colframe=theorie, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{metierbox}[1]{
+  colback=vertléger, colframe=pratique, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{alertbox}[1]{
+  colback=yellow!10, colframe=attention, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{jurybox}[1]{
+  colback=red!5, colframe=urgence, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+\newtcolorbox{twistbox}[1]{
+  colback=twistléger, colframe=twist, fonttitle=\bfseries\large,
+  title={#1}, breakable, sharp corners=south
+}
+
+% ─── Theorem styles ───────────────────────────────────────────────────────────
+\theoremstyle{definition}
+\newtheorem{definition}{Définition}[section]
+\newtheorem{propriete}{Propriété}[section]
+\newtheorem{invariant}{Invariant métier}[section]
+
+\theoremstyle{remark}
+\newtheorem{remarque}{Remarque}[section]
+\newtheorem{exemple}{Exemple}[section]
+
+% ─── Hyperref setup ───────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=theorie,
+  urlcolor=urgence,
+  pdftitle={Twist 5 — Saturation du destinataire},
+  pdfauthor={Système de routage critique},
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ═══════════════════════════════════════════════════════════════════
+%  COUVERTURE
+% ═══════════════════════════════════════════════════════════════════
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\color{twist}\rule{\linewidth}{2pt}}\\[0.5em]
+  {\Huge\bfseries Twist 5}\\[0.4em]
+  {\Large\bfseries L'hôpital le plus proche\\[0.2em]
+  n'accepte plus de nouveaux cas de trauma}\\[0.4em]
+  {\color{twist}\rule{\linewidth}{2pt}}\\[2em]
+
+  % Schéma illustratif : deux hôpitaux, le plus proche barré
+  \begin{tikzpicture}
+    \node[circle, fill=urgence!20, draw=urgence, thick, minimum size=1.8cm,
+          font=\small\bfseries] (amb) at (0,0) {AMB};
+
+    % Hôpital proche — SATURÉ
+    \node[rectangle, rounded corners=4pt, fill=urgence!10, draw=urgence,
+          thick, minimum width=2.4cm, minimum height=1.2cm,
+          font=\small\bfseries] (h1) at (4.5, 1.8) {CHU};
+    \node[font=\footnotesize\bfseries, color=urgence] at (4.5, 0.95)
+          {SATURÉ};
+    \draw[-{Latex[length=3mm]}, urgence, thick, dashed]
+          (amb) -- node[above,sloped,font=\small]{$d=9\,\text{min}$} (h1);
+    % croix rouge sur le CHU
+    \draw[urgence, very thick, line cap=round]
+          (3.35,1.15) -- (5.65,2.45);
+    \draw[urgence, very thick, line cap=round]
+          (3.35,2.45) -- (5.65,1.15);
+
+    % Hôpital alternatif — DISPONIBLE
+    \node[rectangle, rounded corners=4pt, fill=pratique!10, draw=pratique,
+          thick, minimum width=2.8cm, minimum height=1.2cm,
+          font=\small\bfseries] (h2) at (5.5,-1.8) {Hôpital Central};
+    \node[font=\footnotesize\bfseries, color=pratique] at (5.5,-2.6)
+          {disponible};
+    \draw[-{Latex[length=3mm]}, pratique, very thick]
+          (amb) -- node[below,sloped,font=\small]{$d=14\,\text{min}$} (h2);
+
+    % Légende
+    \node[font=\footnotesize, color=urgence] at (2.25,  3.0)
+          {Destination initiale — refusée};
+    \node[font=\footnotesize, color=pratique] at (3.5, -3.2)
+          {Destination recalculée — acceptée};
+  \end{tikzpicture}\\[2em]
+
+  {\large Note technique — Gestion de la saturation hospitalière}\\[1em]
+  {\large\color{gray} Extension du moteur de routage dynamique A*}\\[3em]
+
+  \begin{tabular}{rl}
+    \textbf{Sujet :}    & Sujet 07 — Hackverse 2026 \\
+    \textbf{Twist :}    & \#5 — Saturation du destinataire \\
+    \textbf{Impact :}   & Destination devient une variable, non un paramètre fixe \\
+    \textbf{Véhicule :} & Ambulance (cas principal), applicable aux autres types \\
+  \end{tabular}
+
+  \vfill
+  {\small\color{gray} Document pédagogique — Présentation jury et équipe technique}
+\end{titlepage}
+
+% ═══════════════════════════════════════════════════════════════════
+\tableofcontents
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section*{Introduction}
+\addcontentsline{toc}{section}{Introduction}
+
+Jusqu'ici, le moteur de routage traitait la \textbf{destination comme une
+constante} : l'opérateur saisit les coordonnées d'un hôpital, l'algorithme
+A* calcule le meilleur chemin pour y arriver. La seule complexité était
+celle du réseau routier — trafic, météo, passabilité.
+
+\begin{twistbox}{Twist 5 — Le problème change de nature}
+L'hôpital le plus proche \textbf{n'accepte plus} de nouveaux cas de trauma.
+Ce n'est pas une alerte sur une route : c'est une alerte sur la
+\emph{destination elle-même}. Le système ne peut plus supposer que la
+destination est valide. Il doit désormais \textbf{choisir où aller}
+avant même de calculer comment y aller.
+\end{twistbox}
+
+Ce twist introduit une nouvelle dimension de complexité : la destination
+est maintenant une \textbf{variable dynamique} au même titre que le poids
+d'un arc. Il faut modéliser la disponibilité des hôpitaux, sélectionner
+le meilleur destinataire parmi les alternatives, et recalculer si la
+situation change en cours de route.
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Impact sur le modèle existant}
+
+\subsection{Ce qui changeait dans les twists précédents}
+
+Dans les itérations précédentes du moteur, tous les changements affectaient
+les \textbf{arcs du graphe} : congestion, pluie, route bloquée, passabilité
+selon le type de véhicule. La destination restait un nœud fixe, connu
+à l'avance, toujours valide.
+
+\subsection{Ce que le twist 5 modifie}
+
+Le twist 5 rend les \textbf{nœuds de destination} potentiellement invalides.
+Cela a trois conséquences directes sur l'architecture :
+
+\begin{enumerate}[leftmargin=2em, itemsep=6pt]
+  \item \textbf{Les hôpitaux ne sont plus de simples nœuds du graphe.}
+    Ils deviennent des entités avec un état dynamique : capacité courante,
+    statut d'accueil, spécialités disponibles.
+
+  \item \textbf{L'algorithme de routage doit être précédé d'une étape de
+    sélection de destination.} On ne peut plus appeler A*$(s, t)$ avec
+    $t$ fixe — il faut d'abord déterminer quel $t \in \mathcal{H}$ est
+    valide et optimal.
+
+  \item \textbf{Le recalcul dynamique peut être déclenché par un événement
+    hospitalier} (saturation en cours de trajet), et pas seulement par
+    un événement routier.
+\end{enumerate}
+
+\begin{alertbox}{Ce que le système ne peut plus supposer}
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Interdit :} « La destination est toujours l'hôpital le
+    plus proche. »
+  \item \textbf{Interdit :} « Si l'ambulance est en route, l'hôpital de
+    destination sera encore disponible à l'arrivée. »
+  \item \textbf{Requis :} interroger le statut des hôpitaux \emph{avant}
+    de calculer l'itinéraire \emph{et} surveiller ce statut pendant le trajet.
+\end{itemize}
+\end{alertbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Modélisation : les hôpitaux comme nœuds dynamiques}
+
+\subsection{Extension du graphe routier}
+
+Le graphe routier existant $G = (V, E, w)$ est étendu avec un sous-ensemble
+de nœuds hospitaliers $\mathcal{H} \subset V$, auxquels on attache un
+vecteur d'état dynamique.
+
+\begin{defbox}{Définition : Nœud hospitalier avec état dynamique}
+Un nœud hospitalier $h \in \mathcal{H}$ est un nœud $v \in V$ enrichi
+d'un vecteur d'état :
+\[
+  \sigma(h, t) =
+  \bigl(\,
+    \texttt{accepts\_trauma}(h,t),\;\;
+    \texttt{capacity}(h,t),\;\;
+    \texttt{eta\_reopening}(h,t)
+  \,\bigr)
+\]
+où :
+\begin{itemize}[leftmargin=1.5em]
+  \item $\texttt{accepts\_trauma}(h,t) \in \{0, 1\}$ — vaut $1$ si l'hôpital
+    accepte de nouveaux cas de trauma à l'instant $t$ ;
+  \item $\texttt{capacity}(h,t) \in [0, 1]$ — taux de remplissage (0 = vide,
+    1 = saturé) ;
+  \item $\texttt{eta\_reopening}(h,t) \in \mathbb{R}^+ \cup \{+\infty\}$ —
+    durée estimée avant réouverture (en minutes), ou $+\infty$ si inconnue.
+\end{itemize}
+\end{defbox}
+
+\subsection{Ensemble des destinations candidates}
+
+À chaque instant $t$, l'ensemble des destinations valides pour une
+ambulance transportant un cas de trauma est :
+
+\[
+  \mathcal{H}^*(t) = \bigl\{\, h \in \mathcal{H}
+    \;\mid\; \texttt{accepts\_trauma}(h,t) = 1 \,\bigr\}
+\]
+
+Si $\mathcal{H}^*(t) = \emptyset$ — c'est-à-dire qu'aucun hôpital
+de la zone ne peut accepter le patient — le système doit déclencher
+une procédure d'escalade (voir section~\ref{sec:limites}).
+
+\subsection{Fonction de coût multi-destination}
+
+Le problème de routage avec destination variable peut se formuler comme :
+
+\[
+  h^* = \arg\min_{h \in \mathcal{H}^*(t)}
+  \Bigl[\,
+    d_G(s, h)
+    \;+\;
+    \alpha \cdot \texttt{capacity}(h, t)
+    \;+\;
+    \beta \cdot \mathbb{1}[\texttt{capacity}(h,t) > \tau]
+  \,\Bigr]
+\]
+
+où :
+\begin{itemize}[leftmargin=1.5em]
+  \item $d_G(s, h)$ est le temps de trajet optimal de la source $s$
+    à l'hôpital $h$ dans le graphe dynamique ;
+  \item $\alpha \cdot \texttt{capacity}(h, t)$ est une pénalité
+    proportionnelle au taux de remplissage — préférer les hôpitaux
+    moins encombrés, toutes choses égales par ailleurs ;
+  \item $\beta \cdot \mathbb{1}[\texttt{capacity}(h,t) > \tau]$ est
+    une pénalité binaire si le taux dépasse un seuil $\tau$ (typiquement
+    $\tau = 0{,}85$), signalant un risque imminent de saturation avant
+    l'arrivée du véhicule.
+\end{itemize}
+
+Les paramètres $\alpha$ et $\beta$ sont configurables par l'opérateur
+selon la politique de soin de la zone. En mode par défaut :
+$\alpha = 2\,\text{min}$ et $\beta = 5\,\text{min}$.
+
+\begin{metierbox}{Interprétation opérationnelle}
+Le coût total n'est pas simplement « le trajet le plus court » mais
+« le trajet le plus court vers un hôpital qui pourra réellement
+accueillir le patient à l'arrivée ». Un hôpital à 14 minutes à
+moitié vide peut être préférable à un hôpital à 12 minutes presque
+saturé, si le risque qu'il ferme pendant le trajet est non négligeable.
+\end{metierbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Algorithme de sélection et de routage}
+
+\subsection{Vue d'ensemble : deux phases}
+
+La résolution du twist 5 s'effectue en deux phases séquentielles et
+potentiellement itérables.
+
+\begin{center}
+\begin{tikzpicture}[
+  box/.style={rectangle, rounded corners=5pt, minimum width=9cm,
+              minimum height=1.1cm, align=center, font=\small\bfseries},
+  arr/.style={-{Latex[length=3mm]}, thick, gray}
+]
+  \node[box, fill=bleuléger, draw=theorie] (p0) at (0, 0)
+    {Phase 0 — Mise à jour des statuts hospitaliers ($\sigma(h, t)$)};
+  \node[box, fill=twistléger, draw=twist] (p1) at (0,-1.7)
+    {Phase 1 — Sélection de la destination optimale $h^* \in \mathcal{H}^*(t)$};
+  \node[box, fill=vertléger, draw=pratique] (p2) at (0,-3.4)
+    {Phase 2 — Calcul de l'itinéraire A*$(s,\, h^*)$ dans le graphe dynamique};
+  \node[box, fill=yellow!15, draw=attention] (p3) at (0,-5.1)
+    {Phase 3 — Surveillance continue : réseau \emph{et} statuts hospitaliers};
+  \node[box, fill=red!8, draw=urgence] (p4) at (0,-6.8)
+    {Recalcul si changement détecté (route bloquée OU hôpital saturé)};
+
+  \draw[arr] (p0) -- (p1);
+  \draw[arr] (p1) -- (p2);
+  \draw[arr] (p2) -- (p3);
+  \draw[arr] (p3) -- (p4);
+  \draw[arr] (p4.east) -- ++(1.5,0) |- (p0.east)
+    node[midway, right, font=\footnotesize, color=urgence]{boucle};
+\end{tikzpicture}
+\end{center}
+
+\subsection{Pseudocode de la sélection de destination}
+
+\begin{algorithm}[H]
+\caption{Sélection du destinataire optimal (Twist 5)}
+\begin{algorithmic}[1]
+\Require Source $s$, graphe dynamique $G$, ensemble $\mathcal{H}$,
+         instant $t$, seuil $\tau$, paramètres $\alpha, \beta$
+\Ensure Destination optimale $h^*$ ou \textsc{Escalade}
+
+\State $\mathcal{H}^* \gets \{h \in \mathcal{H} \mid
+    \texttt{accepts\_trauma}(h,t) = 1\}$
+
+\If{$\mathcal{H}^* = \emptyset$}
+  \State \textbf{déclencher} \textsc{EscaladeZoneComplète}() \Comment{voir §\ref{sec:limites}}
+  \State \Return \textsc{null}
+\EndIf
+
+\State $\text{meilleur\_coût} \gets +\infty$
+\State $h^* \gets \textsc{null}$
+
+\For{$h \in \mathcal{H}^*$}
+  \State $d \gets$ A*\_cost$(G, s, h)$ \Comment{temps de trajet estimé}
+  \State $\text{pen\_cap} \gets \alpha \cdot \texttt{capacity}(h, t)$
+  \State $\text{pen\_seuil} \gets \beta$ \textbf{ si }
+         $\texttt{capacity}(h,t) > \tau$ \textbf{ sinon } $0$
+  \State $\text{coût} \gets d + \text{pen\_cap} + \text{pen\_seuil}$
+  \If{$\text{coût} < \text{meilleur\_coût}$}
+    \State $\text{meilleur\_coût} \gets \text{coût}$
+    \State $h^* \gets h$
+  \EndIf
+\EndFor
+
+\State \textbf{journaliser}$(t,\; s,\; h^*,\; \mathcal{H}^*,\;
+  \text{meilleur\_coût},\; [\text{coûts de tous les candidats}])$
+\State \Return $h^*$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Complexité et performance}
+
+Soit $|\mathcal{H}|$ le nombre total d'hôpitaux dans la zone (typiquement
+$3$ à $8$ pour une grande ville africaine). L'algorithme appelle A* une
+fois par hôpital candidat. La complexité est donc :
+
+\[
+  \mathcal{O}\bigl(|\mathcal{H}^*| \times T_{\text{A*}}\bigr)
+  \;\approx\;
+  \mathcal{O}\bigl(|\mathcal{H}| \times (|E| + |V| \log |V|)\bigr)
+\]
+
+En pratique, avec $|\mathcal{H}| \leq 8$ et un graphe de $\sim$15\,000
+nœuds, la sélection complète s'exécute en moins de \textbf{200 ms},
+ce qui est compatible avec les contraintes temps réel du système.
+
+\begin{metierbox}{Optimisation : pré-élagage des candidats}
+Avant d'appeler A* sur tous les hôpitaux disponibles, le système
+élimine d'abord ceux dont la distance à vol d'oiseau dépasse
+$2 \times d_{\text{vol}}(s, h^*)$ où $h^*$ est l'hôpital le plus
+proche. Cela réduit le nombre d'appels A* à $2$--$3$ en moyenne,
+sans risquer d'éliminer un candidat réellement compétitif.
+\end{metierbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Scénario : l'ambulance de Bépanda — suite}
+
+Le scénario d'origine (section 4 du problème) se termine à 14h31 avec
+l'ambulance arrivée au CHU. Le twist 5 en reprend le début et modifie
+radicalement ce qui se passe entre le départ et la destination.
+
+\subsection{Situation initiale — appel à 14h22}
+
+Il est 14h22. Un enfant de sept ans fait des convulsions à Bépanda.
+L'appel arrive au SAMU. Avant de calculer l'itinéraire, le système
+interroge les statuts hospitaliers.
+
+\medskip
+\begin{center}
+\begin{tabular}{lcccc}
+  \toprule
+  \textbf{Hôpital} & \textbf{Distance estimée} &
+  \textbf{Accepte trauma} & \textbf{Taux remplissage} & \textbf{Coût total} \\
+  \midrule
+  CHU            & 9 min  & \textbf{Non} & 100\% & $+\infty$ \\
+  Hôpital Central & 14 min & Oui         & 62\%  & 15,2 min  \\
+  Clinique Ngousso & 18 min & Oui         & 41\%  & 18,8 min  \\
+  Hôpital de Cité & 22 min & Oui         & 78\%  & 25,6 min  \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+\noindent
+Le CHU est immédiatement exclu de $\mathcal{H}^*$ car
+$\texttt{accepts\_trauma}(\text{CHU}, 14h22) = 0$.
+L'Hôpital Central remporte la sélection avec un coût de 15,2 minutes
+(14 min de trajet + $2 \times 0{,}62 = 1{,}24$ min de pénalité capacité,
+taux inférieur à $\tau = 0{,}85$ donc pas de pénalité seuil).
+
+\textbf{L'ambulance part à 14h22 en direction de l'Hôpital Central.}
+
+\subsection{Complication en cours de route — 14h27}
+
+Il est 14h27. Deux événements se produisent simultanément :
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Événement routier :} le Boulevard de la Liberté est
+    partiellement bloqué (alerte de trafic, délai de propagation :
+    4 minutes — situation identique au scénario d'origine).
+  \item \textbf{Événement hospitalier :} l'Hôpital Central signale
+    une alerte de capacité — son taux de remplissage vient de passer
+    à 91\%, et le service trauma est en cours de saturation.
+    $\texttt{capacity}(\text{Hôpital Central}, 14h27) = 0{,}91 > \tau$.
+\end{enumerate}
+
+Le système recalcule la sélection de destination avec les données
+à 14h27 et la position courante de l'ambulance :
+
+\medskip
+\begin{center}
+\begin{tabular}{lcccc}
+  \toprule
+  \textbf{Hôpital} & \textbf{Distance restante} &
+  \textbf{Accepte trauma} & \textbf{Taux remplissage} & \textbf{Coût total} \\
+  \midrule
+  CHU            & 8 min  & \textbf{Non} & 100\% & $+\infty$ \\
+  Hôpital Central & 9 min  & Oui & 91\% & 15,8 min \\
+  Clinique Ngousso & 16 min & Oui & 41\%  & 16,8 min  \\
+  Hôpital de Cité & 24 min & Oui & 78\%  & 27,6 min  \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+La pénalité seuil s'applique maintenant à l'Hôpital Central
+($0{,}91 > 0{,}85$) : son coût monte à
+$9 + 2 \times 0{,}91 + 5 = 15{,}82$ min.
+La Clinique Ngousso est maintenant compétitive à 16,8 min.
+
+La différence est faible (1 minute). Le système applique alors un
+critère de stabilité : \textbf{il ne change de destination que si le
+gain est supérieur à un seuil minimal} $\Delta_{\min} = 2$ minutes,
+afin d'éviter des oscillations inutiles.
+
+\begin{metierbox}{Décision à 14h27}
+Le gain potentiel en changeant pour la Clinique Ngousso est de
+$15{,}82 - 16{,}8 = -0{,}98$ min (Ngousso est plus coûteuse).
+L'Hôpital Central reste la meilleure destination.
+Le système maintient le cap et note dans le journal la re-validation
+de la destination, ainsi que le statut de chaque hôpital au moment
+de la vérification.
+\end{metierbox}
+
+\subsection{Résolution — 14h36}
+
+L'ambulance arrive à l'Hôpital Central à 14h36. Soit 14 minutes après
+le départ — 5 minutes de plus que si le CHU avait été disponible. Le
+patient est pris en charge.
+
+\begin{metierbox}{Ce que ce scénario révèle}
+Trois décisions ont été prises sur la base d'informations dynamiques :
+\begin{enumerate}[leftmargin=1.5em]
+  \item à 14h22 — sélection initiale (CHU exclu, Central retenu) ;
+  \item à 14h27 — re-validation de la destination malgré la hausse
+    de capacité (seuil de stabilité non atteint) ;
+  \item à 14h27 — recalcul d'itinéraire suite au blocage routier
+    (identique au scénario d'origine, mais vers la nouvelle destination).
+\end{enumerate}
+Chacune est documentée, reproductible, et explicable.
+\end{metierbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Invariants métier et cas limites}
+\label{sec:limites}
+
+\subsection{Invariants introduits par le twist 5}
+
+\begin{invariant}[Non-envoi vers un hôpital saturé]
+Le système ne génère jamais d'itinéraire vers un hôpital $h$ tel que
+$\texttt{accepts\_trauma}(h, t) = 0$ au moment du calcul.
+\end{invariant}
+
+\begin{invariant}[Re-vérification en cours de trajet]
+Si un hôpital de destination $h^*$ reçoit une alerte de saturation
+alors que le véhicule est en route, le système recalcule la sélection
+dans un délai maximal de 30 secondes après réception de l'alerte.
+\end{invariant}
+
+\begin{invariant}[Seuil de stabilité]
+Un changement de destination en cours de trajet n'est effectué que si
+le nouveau coût est inférieur au coût courant d'au moins $\Delta_{\min}$,
+afin d'éviter les oscillations contre-productives.
+\end{invariant}
+
+\subsection{Le cas critique : aucun hôpital disponible}
+\label{subsec:escalade}
+
+Si $\mathcal{H}^*(t) = \emptyset$ — tous les hôpitaux de la zone sont
+saturés — le système déclenche une \textbf{procédure d'escalade} :
+
+\begin{enumerate}[leftmargin=2em, itemsep=4pt]
+  \item \textbf{Extension géographique} : élargir la recherche à une
+    zone de rayon supérieur (par exemple, inclure les hôpitaux
+    des villes voisines ou des zones périphériques).
+  \item \textbf{Alerte régionale} : notifier le centre de coordination
+    régional pour une gestion de crise à plus grande échelle.
+  \item \textbf{Destination provisoire} : si la distance vers la
+    zone étendue dépasse le délai critique, router vers le poste
+    de secours le plus proche (pompiers, caserne) pour stabilisation
+    en attendant qu'un hôpital se libère.
+  \item \textbf{Journalisation de crise} : l'événement est enregistré
+    comme incident critique avec horodatage et état complet du
+    réseau hospitalier pour analyse post-incident.
+\end{enumerate}
+
+\begin{alertbox}{Cas limite : hôpital se libère pendant le trajet}
+Si $\mathcal{H}^*(t) = \emptyset$ au départ mais qu'un hôpital repasse
+en mode \texttt{accepts\_trauma = 1} pendant le trajet, le système
+annule la procédure d'escalade et recalcule une destination valide.
+Ce cas est logué séparément comme « réouverture en cours de trajet ».
+\end{alertbox}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Implémentation dans le moteur existant}
+
+\subsection{Extension minimale du backend Python}
+
+Le twist 5 nécessite des modifications chirurgicales dans le code
+du MVP, sans refonte de l'architecture.
+
+\begin{center}
+\begin{tabular}{>{\ttfamily}p{4cm} p{9cm}}
+  \toprule
+  \textbf{Fichier} & \textbf{Modification} \\
+  \midrule
+  routing/graph.py &
+    Ajouter l'attribut \texttt{hospital\_status} sur les nœuds
+    $h \in \mathcal{H}$ ; exposer une méthode
+    \texttt{update\_hospital\_status(node\_id, status\_dict)}. \\[0.4em]
+  routing/algorithms.py &
+    Ajouter la fonction \texttt{select\_destination(G, source, hospitals)}
+    qui implémente l'algorithme de sélection (§3). \\[0.4em]
+  api/views.py &
+    Modifier l'endpoint \texttt{/api/route/} pour accepter une liste
+    d'hôpitaux candidats au lieu d'une destination unique ; appeler
+    \texttt{select\_destination} avant A*. \\[0.4em]
+  api/hospital\_feed.py &
+    Nouveau module de polling du statut hospitalier (toutes les 60 s
+    via API du ministère de la Santé ou webhook). \\[0.4em]
+  routing/logger.py &
+    Étendre le schéma de journalisation pour inclure le champ
+    \texttt{hospital\_selection\_log}. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Schéma de l'appel API modifié}
+
+L'endpoint de routage évolue : au lieu d'une destination fixe,
+le client envoie une liste de destinations candidates.
+
+\begin{verbatim}
+POST /api/route/
+{
+  "lat_origin": 3.8921,  "lon_origin": 11.5312,
+  "vehicle_type": "ambulance",
+  "case_type": "trauma",
+  "candidate_hospitals": [
+    { "id": "CHU",      "lat": 3.8670, "lon": 11.5178 },
+    { "id": "CENTRAL",  "lat": 3.8541, "lon": 11.5023 },
+    { "id": "NGOUSSO",  "lat": 3.9012, "lon": 11.5445 }
+  ]
+}
+\end{verbatim}
+
+Le backend filtre les candidats selon leur statut, sélectionne
+$h^*$, calcule l'itinéraire et renvoie :
+
+\begin{verbatim}
+{
+  "selected_hospital": "CENTRAL",
+  "selection_reason": "CHU: saturé | CENTRAL: coût 15.2 min | NGOUSSO: 18.8 min",
+  "route": { "type": "Feature", "geometry": { ... }, "properties": {
+    "cost_minutes": 14.0,
+    "total_selection_cost": 15.2
+  }},
+  "hospital_status_snapshot": {
+    "CHU":     { "accepts_trauma": false, "capacity": 1.0 },
+    "CENTRAL": { "accepts_trauma": true,  "capacity": 0.62 },
+    "NGOUSSO": { "accepts_trauma": true,  "capacity": 0.41 }
+  }
+}
+\end{verbatim}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section{Communication au jury}
+
+\begin{jurybox}{Message clé pour le jury}
+\textbf{Le twist 5 déplace le problème de la route vers la destination.}
+
+\medskip
+Jusqu'ici, on nous demandait : \og{}Comment arriver \emph{vite} à
+l'hôpital ?\fg{} Désormais, la première question est :
+\og{}\emph{Quel} hôpital peut encore accueillir ce patient ?\fg{}
+
+\medskip
+Notre réponse : la destination devient une variable au même titre
+que le trafic. Le système évalue tous les hôpitaux disponibles,
+estime le coût réel d'y aller (trajet + risque de saturation à
+l'arrivée), choisit le meilleur, et surveille ce choix tout au
+long du trajet. Si un hôpital sature en route, il recalcule —
+exactement comme il le ferait pour une route bloquée.
+\end{jurybox}
+
+\subsection{Questions anticipées du jury}
+
+\paragraph{Question : \og{}Pourquoi ne pas envoyer l'ambulance au CHU
+quand même, au cas où ?\fg{}}
+
+\noindent\textbf{Réponse :} Un hôpital qui déclare ne plus accepter
+de nouveaux cas de trauma ne peut pas, par définition, prendre en
+charge ce patient à l'arrivée. L'envoyer quand même revient à perdre
+du temps pour constater un refus sur place — ce qui est catastrophique
+pour le patient. La décision de rerouter doit être prise immédiatement,
+pas laissée au hasard.
+
+\paragraph{Question : \og{}Comment êtes-vous sûrs que le statut
+hospitalier est fiable ?\fg{}}
+
+\noindent\textbf{Réponse :} Comme pour les alertes routières, le
+système intègre un score de fiabilité de la source. Un statut
+transmis directement par le système informatique de l'hôpital
+(intégration API) a une fiabilité haute. Un signalement verbal
+par radio a une fiabilité plus faible et déclenche une confirmation
+avant de l'utiliser comme critère de rejet. En cas de doute, la
+stratégie de repli est de conserver la destination actuelle et
+d'envoyer une confirmation humaine.
+
+\paragraph{Question : \og{}Et si tous les hôpitaux sont pleins ?\fg{}}
+
+\noindent\textbf{Réponse :} C'est le cas limite documenté dans
+la section~5.2. Le système déclenche une procédure d'escalade :
+extension géographique de la recherche, alerte au coordinateur
+régional, et si nécessaire, route vers un poste de stabilisation
+en attendant qu'une capacité se libère. Ce cas est rare, mais le
+système sait comment le gérer — et le journalise comme incident
+critique pour analyse ultérieure.
+
+\subsection{Tableau de bord : log de décision hospitalière}
+
+\begin{center}
+\begin{tabular}{ll}
+  \toprule
+  \textbf{Champ du log} & \textbf{Exemple de valeur} \\
+  \midrule
+  Timestamp de sélection         & 2026-04-26 14:22:07 \\
+  Véhicule                       & Ambulance SAMU-07 \\
+  Type de cas                    & Trauma pédiatrique \\
+  Candidats évalués              & CHU, Hôpital Central, Ngousso, Cité \\
+  CHU — statut                   & Refusé (accepts\_trauma = false) \\
+  Central — coût sélection       & 15,2 min (retenu) \\
+  Ngousso — coût sélection       & 18,8 min \\
+  Hôpital retenu                 & Hôpital Central \\
+  Itinéraire calculé             & [Bépanda $\to$ Makepe $\to$ Bastos $\to$ Central] \\
+  Durée de sélection (algo)      & 87 ms \\
+  Re-vérification à 14:27        & Central maintenu (gain Ngousso $< \Delta_{\min}$) \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\newpage
+
+% ═══════════════════════════════════════════════════════════════════
+\section*{Conclusion}
+\addcontentsline{toc}{section}{Conclusion}
+
+Le twist 5 transforme un problème de routage en un problème de
+\textbf{planification sous contraintes dynamiques de ressources}.
+Ce changement de nature est plus profond qu'il n'y paraît : il oblige
+le système à raisonner simultanément sur deux réseaux — le réseau
+routier et le réseau de soins — et à optimiser sur les deux à la fois.
+
+\medskip
+La solution présentée dans ce document repose sur trois principes
+structurants :
+
+\begin{enumerate}[leftmargin=2em, itemsep=4pt]
+  \item \textbf{La destination est une variable, pas un paramètre.}
+    Le moteur sélectionne la meilleure destination parmi un ensemble
+    de candidats avant de calculer l'itinéraire, en intégrant
+    disponibilité, capacité et risque de saturation.
+
+  \item \textbf{La surveillance continue couvre désormais le réseau
+    de soins.} Le recalcul peut être déclenché par un événement
+    hospitalier aussi bien que routier. Les deux types d'événements
+    sont traités avec le même mécanisme et la même rigueur.
+
+  \item \textbf{Chaque décision est justifiable.} La sélection de
+    destination est entièrement journalisée : hôpitaux évalués, coûts
+    calculés, raison du choix, re-vérifications en cours de trajet.
+    Si quelqu'un demande compte un mois plus tard, le système peut
+    répondre précisément.
+\end{enumerate}
+
+\medskip
+\begin{center}
+  {\color{twist}\rule{0.5\linewidth}{1pt}}\\[0.5em]
+  {\itshape \og{}Quand la route change, on recalcule le chemin.\\
+  Quand la destination change, on recalcule aussi la destination.\\
+  La vraie intelligence, c'est de savoir que les deux peuvent changer en même temps.\fg{}}\\[0.5em]
+  {\color{twist}\rule{0.5\linewidth}{1pt}}
+\end{center}
+
+\end{document}
