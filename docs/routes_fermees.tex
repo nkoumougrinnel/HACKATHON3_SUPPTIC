@@ -1,0 +1,304 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Packages ────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{amsmath, amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+
+% ─── Colors ──────────────────────────────────────────────────────────────────
+\definecolor{urgence}{RGB}{180,30,30}
+\definecolor{theorie}{RGB}{30,80,160}
+\definecolor{pratique}{RGB}{20,130,80}
+\definecolor{attention}{RGB}{200,120,0}
+\definecolor{bleuléger}{RGB}{230,240,255}
+\definecolor{rougeclair}{RGB}{255,235,235}
+\definecolor{orangeclair}{RGB}{255,245,225}
+\definecolor{grisléger}{RGB}{245,245,248}
+\definecolor{noirbloc}{RGB}{25,25,40}
+
+% ─── Custom boxes ─────────────────────────────────────────────────────────────
+\newtcolorbox{defbox}[1]{
+  colback=bleuléger, colframe=theorie, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+\newtcolorbox{alertbox}[1]{
+  colback=rougeclair, colframe=urgence, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+\newtcolorbox{methbox}[1]{
+  colback=grisléger, colframe=gray!50, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+\newtcolorbox{exemplebox}[1]{
+  colback=orangeclair, colframe=attention, fonttitle=\bfseries,
+  title={#1}, breakable, sharp corners=south
+}
+
+% ─── Hyperref ─────────────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=theorie,
+  urlcolor=urgence,
+  pdftitle={Twist 4 — Routes fermées brutalement},
+  pdfauthor={Songo — Simulation de routage},
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries Twist 4 : Routes ferm\'ees brutalement}\\[6pt]
+  {\large Recalcul en cours d'intervention et justification de d\'ecision}\\[3pt]
+  {\small\color{gray} Songo MVP --- Routage dynamique A*}
+\end{center}
+
+\vspace{0.4cm}
+
+\noindent
+Dans une intervention r\'eelle, l'environnement ne reste pas fig\'e.
+Un axe parfaitement praticable au d\'epart peut \^etre \textbf{ferm\'e sans pr\'evenir}
+en cours de route : accident, foule, barrage de s\'ecurit\'e, effondrement, inondation soudaine.
+Le syst\`eme doit alors r\'eagir \textbf{imm\'ediatement}, recalculer un nouvel
+itin\'eraire depuis la position courante du v\'ehicule, et \textbf{justifier
+le changement} --- tant pour le conducteur que pour le jury.
+
+\bigskip
+
+% ── 1. D\'efinition du probl\`eme ────────────────────────────────────────────
+\begin{defbox}{D\'efinition --- Fermeture brutale d'un arc}
+Soit $G = (V, E, w)$ le graphe routier dynamique, o\`u $w(e, t)$ est le poids
+de l'arc $e$ au temps simul\'e $t$.
+Une \textbf{fermeture brutale} est la transition instantan\'ee~:
+\[
+  w(e,\, t^-) \;<\; +\infty
+  \quad\longrightarrow\quad
+  w(e,\, t^+) = +\infty
+\]
+\`a un instant $t$ imprévisible, alors que le v\'ehicule est d\'ej\`a en route.
+L'arc $e$ est ainsi retir\'e de l'espace de recherche pour tout recalcul ult\'erieur.
+\end{defbox}
+
+\bigskip
+
+% ── 2. Pourquoi c'est critique ───────────────────────────────────────────────
+\begin{alertbox}{Pourquoi ce twist est critique pour un v\'ehicule d'urgence}
+\begin{itemize}[leftmargin=1.5em, itemsep=4pt]
+  \item \textbf{L'itin\'eraire initial devient invalide} : le v\'ehicule suit
+        un chemin qui n'existe plus ; continuer sans recalcul peut mener
+        \`a un cul-de-sac ou \`a un danger direct.
+  \item \textbf{Le temps perdu est irr\'ecup\'erable} : chaque seconde de
+        h\'esitation devant une route bloqu\'ee aggrave la situation
+        \`a destination (patient, incendie, incident).
+  \item \textbf{La position courante change le probl\`eme} : le v\'ehicule
+        n'est plus \`a son point de d\'epart initial ; le recalcul doit partir
+        de l\`a o\`u il se trouve \textit{maintenant}, pas du d\'epart original.
+  \item \textbf{La justification est obligatoire} : le conducteur doit comprendre
+        pourquoi l'itin\'eraire change, et le jury doit voir que la d\'ecision
+        est logique et tra\c{c}able.
+\end{itemize}
+\end{alertbox}
+
+\bigskip
+
+% ── 3. M\'ecanisme de d\'etection ────────────────────────────────────────────
+\section*{1. D\'etection de la fermeture}
+
+Trois sources peuvent d\'eclencher une fermeture brutale dans la simulation~:
+
+\begin{enumerate}[leftmargin=1.5em, itemsep=4pt]
+  \item \textbf{\'Ev\'enement manuel} : le d\'emonstrateur clique sur le bouton
+        ``Bloquer axe'' dans l'interface ; un marqueur rouge appara\^it sur la carte
+        et l'arc correspondant est mis \`a $+\infty$ imm\'ediatement.
+  \item \textbf{\'Ev\'enement automatiqu\'e} : le moteur injecte automatiquement
+        un blocage \`a $t + 20$~minutes simul\'ees, sur un arc situ\'e
+        en avant du v\'ehicule, pour illustrer le sc\'enario sans intervention
+        humaine.
+  \item \textbf{\'Ev\'enement contextuel} : une pluie soudaine ($t + 10$~min)
+        peut rendre certains axes impraticables ($w \to +\infty$), ce qui
+        constitue une fermeture fonctionnelle m\^eme sans blocage physique.
+\end{enumerate}
+
+\noindent
+Dans tous les cas, d\`es que la mise \`a jour du graphe est d\'etect\'ee,
+le moteur v\'erifie si \textbf{l'arc bloqu\'e appartient au chemin courant}.
+Si oui, le recalcul est d\'eclench\'e sans d\'elai.
+
+\bigskip
+
+% ── 4. Proc\'edure de recalcul ───────────────────────────────────────────────
+\section*{2. Proc\'edure de recalcul depuis la position courante}
+
+\begin{methbox}{Algorithme de r\'eponse \`a une fermeture}
+\begin{enumerate}[leftmargin=1.5em, itemsep=3pt]
+  \item \textbf{Gel de la position} : la position exacte $p_{\text{now}}$ du
+        v\'ehicule est captur\'ee par interpolation sur le chemin parcouru.
+  \item \textbf{Mise \`a jour du graphe} : l'arc ferm\'e re\c{c}oit le poids
+        $w = +\infty$ ; les noeuds de d\'etour potentiels conservent leurs
+        poids courants (pluie, congestion, heure).
+  \item \textbf{Relance de A*} : l'algorithme repart de $p_{\text{now}}$
+        vers la destination finale, avec le graphe mis \`a jour.
+        Le chemin d\'ej\`a parcouru est \textbf{conserv\'e} et affich\'e
+        en pointill\'es sur la carte ; seul le tron\c{c}on restant est recalcul\'e.
+  \item \textbf{Validation du r\'esultat} : si A* trouve un chemin alternatif,
+        il remplace imm\'ediatement le tron\c{c}on restant.
+        Sinon, un avertissement est \'emis (``aucune alternative'').
+  \item \textbf{Journalisation} : le moteur enregistre dans le journal la raison
+        du recalcul, la position au moment du blocage, la diff\'erence de distance,
+        et le nouveau temps estim\'e.
+\end{enumerate}
+\end{methbox}
+
+\bigskip
+
+\noindent
+Le pseudo-code ci-dessous formalise la r\'eponse \`a un \'ev\'enement de fermeture~:
+
+\begin{algorithm}[H]
+\caption{R\'eponse \`a une fermeture d'arc en cours d'intervention}
+\begin{algorithmic}[1]
+\Require position courante $p$, destination $d$, graphe $G$, arc ferm\'e $e^*$
+\State $G \leftarrow G$ avec $w(e^*) \leftarrow +\infty$
+\If{$e^* \in \text{chemin\_restant}(p, d)$}
+    \State Suspendre l'avancement du v\'ehicule
+    \State $\pi_{\text{new}} \leftarrow \text{A*}(G,\; p,\; d)$
+    \If{$\pi_{\text{new}} \neq \emptyset$}
+        \State Remplacer le tron\c{c}on restant par $\pi_{\text{new}}$
+        \State Journaliser(raison, $\Delta$km, $\Delta$temps, arc bloqu\'e)
+        \State Reprendre l'avancement sur $\pi_{\text{new}}$
+    \Else
+        \State \'Emettre avertissement ``aucune alternative trouv\'ee''
+    \EndIf
+\Else
+    \State \textit{L'arc ferm\'e n'est pas sur le chemin --- aucune action}
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\bigskip
+
+% ── 5. Justification de la d\'ecision ────────────────────────────────────────
+\section*{3. Justification de la d\'ecision}
+
+Le syst\`eme ne se contente pas de recalculer en silence.
+Chaque recalcul produit une \textbf{entr\'ee dans le journal de simulation}
+visible dans l'interface, structur\'ee comme suit~:
+
+\begin{center}
+\begin{tabular}{lp{9cm}}
+\toprule
+\textbf{Champ} & \textbf{Contenu} \\
+\midrule
+Cause          & Nature de l'\'ev\'enement (blocage manuel, pluie, fermeture auto) \\
+Instant        & Heure simul\'ee au moment du blocage \\
+Position       & Fraction du parcours ($\%$) et kilom\'etrage parcouru \\
+Ancien chemin  & Distance restante avant blocage \\
+Nouveau chemin & Distance et dur\'ee estim\'ee de l'alternative \\
+Gain / Perte   & Diff\'erence en km et en secondes par rapport \`a l'ancien chemin \\
+Qualit\'e alt. & Signal si la d\'eviation est significativement diff\'erente \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+\noindent
+Cette tra\c{c}abilit\'e remplit deux r\^oles~: elle informe le conducteur
+en temps r\'eel, et elle d\'emontre au jury que le moteur \textbf{ne choisit
+pas au hasard} --- chaque d\'eviation est motiv\'ee par des donn\'ees objectives.
+
+\bigskip
+
+% ── 6. Exemple concret ───────────────────────────────────────────────────────
+\begin{exemplebox}{Exemple simul\'e --- Blocage \`a $t + 20$ minutes}
+\textbf{Contexte} : ambulance en route depuis le quartier Bastos vers l'H\^opital
+Central. \`A $t + 20$~minutes simul\'ees, l'avenue Kennedy est ferm\'ee
+(accident simulé).
+
+\medskip
+\begin{tabular}{ll}
+\toprule
+\textbf{\'Etape} & \textbf{\'Etat du syst\`eme} \\
+\midrule
+$t = 19$~min  & Ambulance \`a 42\,\% du parcours, sur l'avenue Kennedy \\
+$t = 20$~min  & Fermeture d\'etect\'ee --- $w(\text{Kennedy}) \leftarrow +\infty$ \\
+$t = 20$~min  & A* relanc\'e depuis la position courante \\
+$t = 20$~min  & Alternative : Boulevard de l'URSS $+$ rue de la Joie \\
+Journal       & \textit{``Blocage auto \`a t+20 min --- contournement, +0.8 km, +42 s''} \\
+Affichage     & Ancien tron\c{c}on en pointill\'es, nouveau en rouge plein \\
+\bottomrule
+\end{tabular}
+
+\medskip
+\noindent
+Le conducteur voit imm\'ediatement le changement sur la carte et lit la raison
+dans le journal.
+Le jury constate que le moteur a identifi\'e la fermeture, quantifi\'e
+le surco\^ut, et propos\'e une alternative coh\'erente.
+\end{exemplebox}
+
+\bigskip
+
+% ── 7. Comportement selon le type de v\'ehicule ──────────────────────────────
+\section*{4. Comportement selon le type de v\'ehicule}
+
+La r\'eponse \`a une fermeture est identique pour les trois v\'ehicules,
+mais le \textbf{choix de l'alternative} diff\`ere selon leurs contraintes~:
+
+\medskip
+\begin{tabular}{lp{9.5cm}}
+\toprule
+\textbf{V\'ehicule} & \textbf{Comportement lors du recalcul apr\`es fermeture} \\
+\midrule
+Ambulance
+  & Cherche l'alternative la plus rapide, m\^eme si elle passe par
+    des axes \'etroits ou d\'egrad\'es.
+    Priorit\'e absolue au temps. \\[4pt]
+Pompiers
+  & L'alternative doit satisfaire les contraintes de gabarit.
+    Une ruelle trop \'etroite ou une piste en terre sera ignor\'ee,
+    m\^eme si elle est plus courte. \\[4pt]
+Police
+  & Compromis : l'alternative favorise les grands axes mais accepte
+    une voie secondaire en bon \'etat si elle reste praticable. \\
+\bottomrule
+\end{tabular}
+
+\medskip
+\noindent
+Ainsi, face au \textbf{m\^eme blocage}, les trois v\'ehicules peuvent
+emprunter des itin\'eraires diff\'erents --- ce qui illustre directement
+l'int\'er\^et de la diff\'erenciation des profils pr\'esent\'ee dans
+le document pr\'ec\'edent.
+
+\bigskip
+
+% ── Conclusion ───────────────────────────────────────────────────────────────
+\begin{tcolorbox}[colback=grisléger, colframe=theorie, fonttitle=\bfseries,
+  title={En r\'esum\'e}, sharp corners=south]
+Le Twist~4 met en \'evidence la capacit\'e du moteur \`a g\'erer
+l'\textbf{impr\'evisible en temps r\'eel}.
+Trois propri\'et\'es cl\'es le caract\'erisent~:
+\begin{itemize}[leftmargin=1.5em, itemsep=3pt]
+  \item \textbf{R\'eactivit\'e} : le recalcul est instantan\'e d\`es la d\'etection
+        de la fermeture, sans intervention humaine.
+  \item \textbf{Coh\'erence} : le chemin d\'ej\`a parcouru est pr\'eserv\'e ;
+        seul le tron\c{c}on restant est recalcul\'e depuis la position exacte.
+  \item \textbf{Tra\c{c}abilit\'e} : chaque d\'ecision est journalis\'ee avec
+        sa cause, ses co\^uts et la comparaison avec l'ancien itin\'eraire.
+\end{itemize}
+\end{tcolorbox}
+
+\end{document}
