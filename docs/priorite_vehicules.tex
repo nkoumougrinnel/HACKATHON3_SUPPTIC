@@ -1,0 +1,191 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Packages ────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+\usepackage{hyperref}
+
+% ─── Colors ──────────────────────────────────────────────────────────────────
+\definecolor{urgence}{RGB}{180,30,30}
+\definecolor{theorie}{RGB}{30,80,160}
+\definecolor{pratique}{RGB}{20,130,80}
+\definecolor{attention}{RGB}{200,120,0}
+\definecolor{bleuléger}{RGB}{230,240,255}
+\definecolor{vertléger}{RGB}{230,248,238}
+\definecolor{rougeclair}{RGB}{255,235,235}
+\definecolor{orangeclair}{RGB}{255,245,225}
+\definecolor{bleupolicier}{RGB}{225,235,255}
+
+% ─── Custom boxes ─────────────────────────────────────────────────────────────
+\newtcolorbox{vehiclebox}[2]{
+  colback=#1, colframe=#2, fonttitle=\bfseries\large,
+  title={##1}, breakable, sharp corners=south,
+  left=8pt, right=8pt, top=6pt, bottom=6pt
+}
+
+\newtcolorbox{synthbox}{
+  colback=gray!6, colframe=gray!40, fonttitle=\bfseries,
+  title={Synthèse : influence sur le choix d'itinéraire},
+  breakable, sharp corners=south
+}
+
+% ─── Hyperref ─────────────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=theorie,
+  urlcolor=urgence,
+  pdftitle={Priorités et contraintes des véhicules d'urgence},
+  pdfauthor={Songo — Simulation de routage},
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries Priorités et contraintes des véhicules d'urgence}\\[6pt]
+  {\large Simulation de routage Songo — Yaoundé}\\[3pt]
+  {\small\color{gray} MVP · Routage dynamique A*}
+\end{center}
+
+\vspace{0.5cm}
+
+\noindent
+Dans le MVP de simulation, trois types de véhicules d'urgence sont disponibles :
+l'ambulance, le camion de pompiers et le véhicule de police.
+Bien qu'ils partagent le même moteur de routage (algorithme A* avec poids dynamiques),
+\textbf{leurs contraintes et leurs priorités diffèrent}, ce qui conduit le système
+à calculer des itinéraires différents à départ et destination identiques.
+
+\bigskip
+
+% ── Ambulance ────────────────────────────────────────────────────────────────
+\begin{tcolorbox}[colback=rougeclair, colframe=urgence, fonttitle=\bfseries\large,
+  title={[Ambulance] Ambulance — Priorité absolue : rapidité},
+  breakable, sharp corners=south]
+
+L'ambulance opère sous la contrainte la plus forte : \textbf{chaque seconde compte}.
+Le moteur lui attribue un coefficient de priorité maximal sur le temps de trajet,
+et minimise avant tout la durée, quitte à accepter des routes plus difficiles.
+
+\begin{itemize}[leftmargin=1.5em, itemsep=3pt]
+  \item \textbf{Axes étroits autorisés} : les rues secondaires ou les ruelles sont
+        empruntables si elles raccourcissent le trajet ; la largeur de la voie
+        ne constitue pas un filtre bloquant.
+  \item \textbf{Routes dégradées tolérées} : une piste en terre sera retenue si
+        elle évite un embouteillage sur un axe principal.
+  \item \textbf{Pénalité pluie modérée} : même sous la pluie, le moteur maintient
+        une partie des itinéraires rapides, quitte à augmenter légèrement le risque.
+  \item \textbf{Nuit} : aucune restriction supplémentaire ; la priorité temporelle
+        prime sur toute contrainte de circulation nocturne.
+\end{itemize}
+
+\smallskip
+\textit{Résultat dans la simulation :} l'ambulance obtient systématiquement
+le chemin le plus court en temps, même s'il est sinueux ou peu praticable
+pour un véhicule plus lourd.
+
+\end{tcolorbox}
+
+\bigskip
+
+% ── Pompiers ─────────────────────────────────────────────────────────────────
+\begin{tcolorbox}[colback=orangeclair, colframe=attention, fonttitle=\bfseries\large,
+  title={[Pompiers] Camion de pompiers — Contraintes physiques fortes},
+  breakable, sharp corners=south]
+
+Le camion de pompiers est un \textbf{véhicule lourd} : son gabarit et son poids
+imposent des contraintes physiques que le moteur doit respecter en priorité,
+avant même d'optimiser la durée.
+
+\begin{itemize}[leftmargin=1.5em, itemsep=3pt]
+  \item \textbf{Routes non goudronnées exclues} : les pistes en terre ou les voies
+        non stabilisées reçoivent un poids prohibitif (ou sont bloquées) ;
+        le moteur les contourne systématiquement.
+  \item \textbf{Voies trop étroites exclues} : les ruelles inférieures à un gabarit
+        minimal ne sont pas empruntables, même si elles sont plus rapides.
+  \item \textbf{Zones civiles interdites accessibles} : en contrepartie, le camion
+        peut traverser certains axes normalement fermés aux civils
+        (zones réservées, cours intérieures de bâtiments publics, etc.).
+  \item \textbf{Pénalité pluie élevée} : sur sol détrempé, les routes non goudronnées
+        sont totalement éliminées, resserrant encore l'espace des routes valides.
+\end{itemize}
+
+\smallskip
+\textit{Résultat dans la simulation :} le camion emprunte presque toujours les
+grands axes goudronnés, même si cela allonge le trajet ; il peut toutefois
+se permettre certains raccourcis interdits aux véhicules civils.
+
+\end{tcolorbox}
+
+\bigskip
+
+% ── Police ───────────────────────────────────────────────────────────────────
+\begin{tcolorbox}[colback=bleupolicier, colframe=theorie, fonttitle=\bfseries\large,
+  title={[Police] Police — Équilibre rapidité / accessibilité},
+  breakable, sharp corners=south]
+
+Le véhicule de police adopte un \textbf{profil intermédiaire} : il cherche un
+compromis entre la rapidité et la faisabilité du trajet, sans la contrainte
+physique du poids ni l'urgence vitale de l'ambulance.
+
+\begin{itemize}[leftmargin=1.5em, itemsep=3pt]
+  \item \textbf{Axes étroits partiellement autorisés} : les voies secondaires sont
+        acceptées si leur état est correct, mais le moteur leur applique un léger
+        malus par rapport aux grands axes.
+  \item \textbf{Routes dégradées avec malus} : une piste en terre n'est pas exclue
+        mais reçoit un coefficient défavorable ; elle ne sera choisie qu'en
+        dernier recours.
+  \item \textbf{Priorité tempérée} : contrairement à l'ambulance, la police ne
+        prend pas de risques excessifs pour gagner quelques secondes.
+  \item \textbf{Nuit} : certains axes nocturnes peuvent être évités pour des
+        raisons de sécurité opérationnelle, sans que cela bloque complètement
+        l'itinéraire.
+\end{itemize}
+
+\smallskip
+\textit{Résultat dans la simulation :} la police obtient un trajet souvent proche
+de celui de l'ambulance, mais légèrement plus long — le moteur préfère un chemin
+sûr et accessible à un raccourci risqué.
+
+\end{tcolorbox}
+
+\bigskip
+
+% ── Synthèse ─────────────────────────────────────────────────────────────────
+\begin{synthbox}
+\noindent
+Le tableau suivant résume les différences de traitement dans le moteur A* :
+
+\medskip
+\begin{tabular}{lccc}
+  \toprule
+  \textbf{Critère} & \textbf{Ambulance} & \textbf{Pompiers} & \textbf{Police} \\
+  \midrule
+  Objectif principal     & Temps minimal    & Gabarit / sol    & Équilibre \\
+  Axes étroits           & \checkmark autorisés      & $\times$ bloqués        & $\sim$ malus   \\
+  Routes non goudronnées & $\sim$ tolérées       & $\times$ bloquées       & $\sim$ malus   \\
+  Zones civiles fermées  & $\sim$ selon contexte & \checkmark autorisées     & $\times$ non     \\
+  Pénalité pluie         & Faible           & Très élevée      & Modérée   \\
+  Contrainte nocturne    & Aucune           & Aucune           & Légère    \\
+  \bottomrule
+\end{tabular}
+
+\medskip
+\noindent
+Ces paramètres sont encodés comme \textbf{poids dynamiques} dans le graphe routier.
+Changer de type de véhicule avant de lancer la simulation suffit à modifier
+l'ensemble des coefficients, et donc l'itinéraire proposé — même pour un trajet
+départ–destination identique.
+\end{synthbox}
+
+\end{document}
